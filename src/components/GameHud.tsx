@@ -1,0 +1,225 @@
+import {
+  Bell,
+  Compass,
+  RefreshCw,
+  Shield,
+  Volume2,
+  VolumeX,
+  Waves,
+  Zap,
+} from 'lucide-react';
+import { GameHudState } from '../game/types';
+
+interface GameHudProps {
+  hud: GameHudState;
+  onTriggerTsunami: () => void;
+  onToggleMute: () => void;
+  onRerollPelican: () => void;
+  onRingBell: () => void;
+}
+
+export function GameHud({
+  hud,
+  onTriggerTsunami,
+  onToggleMute,
+  onRerollPelican,
+  onRingBell,
+}: GameHudProps) {
+  const isWarning = hud.disasterPhase === 'warning';
+  const isActive = hud.disasterPhase === 'active';
+  const xpPct = Math.min(100, Math.round((hud.xp / Math.max(1, hud.xpToNext)) * 100));
+  const dangerPct = Math.max(0, Math.min(100, ((16 - hud.waveGapMeters) / 16) * 100));
+
+  return (
+    <>
+      {/* Full-viewport red warning vignette when tsunami approaches */}
+      {(isWarning || (isActive && hud.waveGapMeters < 6)) && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-10 border-[6px] sm:border-[10px] border-rose-500/55 animate-pulse"
+          style={{
+            boxShadow: 'inset 0 0 60px rgba(244, 63, 94, 0.35)',
+          }}
+        />
+      )}
+
+      {/* Top HUD Bar */}
+      <header className="pointer-events-none fixed top-0 inset-x-0 z-20 p-2.5 sm:p-4 flex flex-col gap-2">
+        <div className="flex items-start justify-between gap-2">
+          {/* Left: Assigned Pelican + Distance + Upgrade Tier */}
+          <div className="pointer-events-auto rounded-2xl border border-white/35 bg-slate-950/65 backdrop-blur-md text-white px-3 py-2 sm:px-3.5 sm:py-2.5 shadow-lg max-w-[66%] sm:max-w-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white/40"
+                style={{ backgroundColor: hud.pelican.frameColor }}
+              />
+              <span className="truncate text-xs sm:text-sm font-bold tracking-tight">
+                {hud.pelican.title}
+              </span>
+              <span className="shrink-0 rounded-md bg-amber-400/20 border border-amber-300/35 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-amber-200">
+                Lv.{hud.level}
+              </span>
+            </div>
+
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] sm:text-xs text-slate-200">
+              <span>
+                <strong className="text-white text-xs sm:text-sm">{hud.distanceMeters}m</strong>
+                <span className="text-slate-400 ml-1 text-[10px]">
+                  (最高 {hud.bestDistanceMeters}m)
+                </span>
+              </span>
+              <span className={hud.speedKmh < 0 ? 'text-amber-300' : 'text-sky-300'}>
+                {hud.speedKmh} km/h
+              </span>
+            </div>
+
+            {/* Upgrade Progress Bar */}
+            <div className="mt-1.5 flex items-center gap-2">
+              <div className="h-1.5 flex-1 rounded-full bg-white/15 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-400 transition-all duration-200"
+                  style={{ width: `${hud.level >= 4 ? 100 : xpPct}%` }}
+                />
+              </div>
+              <span className="font-mono text-[10px] text-amber-200 shrink-0">
+                {hud.level >= 4 ? 'MAX' : `⭐ ${hud.xp}/${hud.xpToNext}`}
+              </span>
+            </div>
+
+            {/* Mini Pickup Counters */}
+            <div className="mt-1.5 flex items-center gap-2.5 text-[10px] sm:text-[11px] font-mono text-slate-200">
+              <span title="小鱼（加速）">🐟 {hud.pickups.fish}</span>
+              <span title="小虾（冲刺）">🦐 {hud.pickups.shrimp}</span>
+              <span title="海星（升级）">⭐ {hud.pickups.starfish}</span>
+              <span title="海草（抗浪护盾）">🌿 {hud.pickups.seaweed}</span>
+            </div>
+          </div>
+
+          {/* Right: Quick Controls & Link Back to Timeline */}
+          <div className="pointer-events-auto flex flex-wrap items-center justify-end gap-1.5">
+            {hud.disasterPhase === 'calm' && (
+              <button
+                type="button"
+                onClick={onTriggerTsunami}
+                className="inline-flex items-center gap-1 rounded-xl border border-rose-300/40 bg-rose-600/85 hover:bg-rose-500 text-white px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold shadow-md backdrop-blur transition-colors"
+                title="不用等随机时段，立刻演练海啸警报"
+              >
+                <Waves className="w-3.5 h-3.5" />
+                <span>触发海啸</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onRingBell}
+              aria-label="按铃"
+              className="hidden sm:inline-flex items-center gap-1 rounded-xl border border-white/30 bg-slate-950/60 hover:bg-slate-900/80 text-amber-200 px-2.5 py-1.5 text-xs font-semibold shadow-md backdrop-blur transition-colors"
+              title="空格按铃叮一声"
+            >
+              <Bell className="w-3.5 h-3.5" />
+              <span>叮</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onRerollPelican}
+              aria-label="随机切换鹈鹕"
+              className="inline-flex items-center gap-1 rounded-xl border border-white/30 bg-slate-950/60 hover:bg-slate-900/80 text-white px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold shadow-md backdrop-blur transition-colors"
+              title="重新随机分配一只鹈鹕"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">换鹈鹕</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onToggleMute}
+              aria-label={hud.isMuted ? '开启声音' : '静音'}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/30 bg-slate-950/60 hover:bg-slate-900/80 text-white shadow-md backdrop-blur transition-colors"
+            >
+              {hud.isMuted ? <VolumeX className="w-4 h-4 text-slate-400" /> : <Volume2 className="w-4 h-4 text-sky-300" />}
+            </button>
+
+            <a
+              href="https://ridingpelican.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden md:inline-flex items-center gap-1 rounded-xl border border-white/30 bg-slate-950/60 hover:bg-slate-900/80 text-slate-200 px-2.5 py-1.5 text-xs font-medium shadow-md backdrop-blur transition-colors"
+            >
+              <Compass className="w-3.5 h-3.5 text-orange-400" />
+              <span>AI 进化时间轴</span>
+            </a>
+          </div>
+        </div>
+
+        {/* Center Alert / Calm Tide Status Strip */}
+        <div className="flex flex-col items-center gap-1.5">
+          {isWarning && (
+            <div className="pointer-events-none animate-siren rounded-2xl border border-rose-300/60 bg-rose-600/92 text-white px-4 py-2 shadow-xl backdrop-blur-md text-center max-w-md">
+              <div className="text-xs sm:text-sm font-extrabold tracking-wide">
+                🚨 海啸警报！{hud.phaseRemainingSec} 秒后巨浪扑岸 — 请加速前进！
+              </div>
+              <div className="text-[11px] text-rose-100 mt-0.5">
+                海水正在退潮，沿途多吃小鱼/小虾提速、吃海星升级！
+              </div>
+            </div>
+          )}
+
+          {isActive && (
+            <div className="pointer-events-none rounded-2xl border border-sky-300/45 bg-slate-950/80 text-white px-3.5 py-2 shadow-xl backdrop-blur-md w-full max-w-sm">
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="text-rose-300">
+                  🌊 巨浪距车尾 {hud.waveGapMeters.toFixed(1)}m
+                </span>
+                <span className="font-mono text-sky-300">
+                  剩余 {hud.phaseRemainingSec}s
+                </span>
+              </div>
+              <div className="mt-1.5 h-2 w-full rounded-full bg-white/15 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-sky-400 via-amber-400 to-rose-500 transition-all duration-100"
+                  style={{ width: `${dangerPct}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {!isWarning && !isActive && hud.bannerText && (
+            <div className="pointer-events-none rounded-full border border-white/35 bg-slate-950/65 text-white px-3.5 py-1 text-xs font-semibold shadow-md backdrop-blur-md">
+              {hud.bannerText}
+            </div>
+          )}
+
+          {hud.disasterPhase === 'calm' && !hud.bannerText && (
+            <div className="pointer-events-none rounded-full border border-white/25 bg-slate-950/40 text-sky-100 px-3 py-0.5 text-[11px] font-medium backdrop-blur-sm">
+              🏖️ {hud.todayWaveSeedLabel} · 不操作也会悠闲向前慢骑
+            </div>
+          )}
+
+          {/* Active Buff / Shallow Water Badges */}
+          {(hud.boostRemainingSec > 0 || hud.shieldRemainingSec > 0 || hud.inShallowWater) && (
+            <div className="flex flex-wrap items-center justify-center gap-1.5">
+              {hud.boostRemainingSec > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/85 text-white px-2.5 py-0.5 text-[11px] font-bold shadow">
+                  <Zap className="w-3 h-3" />
+                  海鲜加速 {hud.boostRemainingSec}s
+                </span>
+              )}
+              {hud.shieldRemainingSec > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/85 text-white px-2.5 py-0.5 text-[11px] font-bold shadow">
+                  <Shield className="w-3 h-3" />
+                  海草护盾 {hud.shieldRemainingSec}s
+                </span>
+              )}
+              {hud.inShallowWater && hud.shieldRemainingSec <= 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/90 text-slate-950 px-2.5 py-0.5 text-[11px] font-bold shadow">
+                  💧 靠海浅水略减速，向右变道或吃海草！
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </header>
+    </>
+  );
+}
