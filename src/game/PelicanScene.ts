@@ -4,11 +4,17 @@ import {
   nextRandomCalmDuration,
 } from './disasterScheduler';
 import {
+  createCloudMesh,
   createCollectibleMesh,
+  createLighthouseMesh,
+  createMountainRidge,
   createPalmTreeMesh,
   createPelicanRiderMesh,
+  createSeagullMesh,
   createTsunamiWallMesh,
+  LighthouseRig,
   PelicanRig,
+  SeagullRig,
   TsunamiRig,
 } from './meshes';
 import {
@@ -85,6 +91,13 @@ export class PelicanScene {
   private collectibles: CollectibleEntity[] = [];
   private particles: PopParticle[] = [];
   private bellRingMesh!: THREE.Mesh;
+  private clouds: THREE.Group[] = [];
+  private seagulls: SeagullRig[] = [];
+  private lighthouseRig!: LighthouseRig;
+  private mountainRidge!: THREE.Group;
+  private contactShadow!: THREE.Mesh;
+  private cameraMode: 'action' | 'chill' | 'drone' = 'action';
+  private lastWhooshTime = 0;
 
   // Game simulation state
   private playerX = 1.6;
@@ -402,6 +415,50 @@ export class PelicanScene {
     this.bellRingMesh.rotation.x = -Math.PI / 2;
     this.bellRingMesh.visible = false;
     this.scene.add(this.bellRingMesh);
+
+    // Dynamic 3D Low-Poly Clouds in the sky
+    for (let i = 0; i < 11; i++) {
+      const cloud = createCloudMesh();
+      cloud.position.set(
+        -45 + Math.random() * 90,
+        28 + Math.random() * 16,
+        -180 + i * 25 + (Math.random() - 0.5) * 12,
+      );
+      this.clouds.push(cloud);
+      this.scene.add(cloud);
+    }
+
+    // Distant Rolling Mountain Ridge on the ocean horizon (-X)
+    this.mountainRidge = createMountainRidge();
+    this.scene.add(this.mountainRidge);
+
+    // Coastal Lighthouse on seaward rocky reef
+    this.lighthouseRig = createLighthouseMesh();
+    this.lighthouseRig.group.position.set(-25, 0, -135);
+    this.scene.add(this.lighthouseRig.group);
+
+    // Gliding Coastal Seagulls
+    for (let i = 0; i < 4; i++) {
+      const gull = createSeagullMesh();
+      gull.group.position.set(
+        -8 + (i % 2 === 0 ? -1 : 1) * (2 + Math.random() * 7),
+        7.5 + Math.random() * 5.5,
+        -25 - i * 28,
+      );
+      this.seagulls.push(gull);
+      this.scene.add(gull.group);
+    }
+
+    // Contact shadow blob beneath player's bicycle
+    const shadowGeo = new THREE.CylinderGeometry(0.52, 0.52, 0.02, 16);
+    const shadowMat = new THREE.MeshBasicMaterial({
+      color: 0x0f172a,
+      transparent: true,
+      opacity: 0.4,
+    });
+    this.contactShadow = new THREE.Mesh(shadowGeo, shadowMat);
+    this.contactShadow.position.set(this.playerX, 0.012, this.playerZ);
+    this.scene.add(this.contactShadow);
   }
 
   private spawnPlayer(): void {
@@ -449,6 +506,7 @@ export class PelicanScene {
     this.tsunamiRig.group.visible = false;
     coastalAudio.stopSiren();
     coastalAudio.stopWaveRoar();
+    coastalAudio.startCalmSurf();
   }
 
   public setInput(patch: Partial<InputState>): void {
@@ -484,6 +542,8 @@ export class PelicanScene {
     }
     this.playerX = 1.6;
     this.playerZ = 0;
+    this.playerRig.group.rotation.set(0, 0, 0);
+    this.playerRig.group.position.set(this.playerX, 0, this.playerZ);
     this.level = 1;
     this.xp = 0;
     this.speed = getTierForLevel(1).cruiseSpeed;
@@ -525,6 +585,7 @@ export class PelicanScene {
     this.submergedTimer = 0;
     this.bannerText = '⚠️ 海啸预警！海水正在退潮，快加速前进并抢捡海洋道具！';
     this.bannerTimer = 4.5;
+    coastalAudio.stopCalmSurf();
     coastalAudio.startSiren();
     this.spawnWaveCollectiblesBatch(5);
   }
@@ -537,6 +598,7 @@ export class PelicanScene {
     this.tsunamiRig.group.visible = true;
     this.bannerText = '🌊 海啸来袭！按住前进加速，吃鱼虾海星逃离巨浪！';
     this.bannerTimer = 4.0;
+    coastalAudio.stopCalmSurf();
     coastalAudio.stopSiren();
     coastalAudio.startWaveRoar();
   }
@@ -549,6 +611,7 @@ export class PelicanScene {
     this.bannerTimer = 3.4;
     coastalAudio.stopSiren();
     coastalAudio.stopWaveRoar();
+    coastalAudio.startCalmSurf();
   }
 
   private spawnWaveCollectiblesBatch(count: number): void {
@@ -739,6 +802,13 @@ export class PelicanScene {
       this.stepSimulation(dt, now * 0.001);
     } else {
       this.stepParticles(dt);
+      // Gentle tumble & slow ocean drift during wipeout
+      this.playerRig.group.rotation.z = Math.min(
+        Math.PI * 0.45,
+        this.playerRig.group.rotation.z + dt * 2.5,
+      );
+      this.playerRig.group.position.y = Math.max(-0.6, this.playerRig.group.position.y - dt * 0.6);
+      this.playerRig.group.rotation.x += dt * 1.2;
     }
 
     this.renderer.render(this.scene, this.camera);
@@ -910,6 +980,31 @@ export class PelicanScene {
         if (this.submergedTimer >= 0.22) {
           this.isGameOver = true;
           coastalAudio.playGameOver();
+          // Massive wipeout ocean splash eruption
+          const splashGeo = new THREE.SphereGeometry(0.22, 5, 5);
+          const splashMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.92,
+          });
+          for (let i = 0; i < 28; i++) {
+            const sp = new THREE.Mesh(splashGeo, splashMat);
+            sp.position.set(
+              this.playerX + (Math.random() - 0.5) * 1.8,
+              0.4 + Math.random() * 2.2,
+              this.playerZ + (Math.random() - 0.5) * 1.8,
+            );
+            this.scene.add(sp);
+            this.particles.push({
+              mesh: sp,
+              vel: new THREE.Vector3(
+                (Math.random() - 0.5) * 9,
+                4.8 + Math.random() * 5.2,
+                (Math.random() - 0.5) * 9,
+              ),
+              life: 0.85,
+            });
+          }
           this.emitHud();
           return;
         }
@@ -962,6 +1057,16 @@ export class PelicanScene {
     this.hemiLight.groundColor.lerp(targetGround, Math.min(1, 2.5 * dt));
     this.hemiLight.color.lerp(targetSkyLight, Math.min(1, 2.5 * dt));
 
+    // Whoosh audio cue at high speed or during fish/shrimp boost
+    if ((this.speed > 19 || this.boostTimer > 0) && elapsedSec - this.lastWhooshTime > 1.8) {
+      this.lastWhooshTime = elapsedSec;
+      coastalAudio.playWhoosh();
+    }
+
+    // Contact shadow blob beneath player's bicycle
+    this.contactShadow.position.set(this.playerX, 0.012, this.playerZ);
+    this.contactShadow.rotation.y = this.playerRig.handlebarGroup.rotation.y * 0.5;
+
     // Sailboats gently cruise with world
     this.sailboats.forEach((boat, idx) => {
       boat.position.z = this.playerZ - 45 - idx * 45 + Math.sin(elapsedSec * 0.4 + idx) * 6;
@@ -979,6 +1084,52 @@ export class PelicanScene {
         palm.rotation.x = Math.cos(elapsedSec * 1.5 + idx * 0.4) * 0.03;
       }
     });
+
+    // Clouds drifting with wind and recycling along Z
+    const cloudDrift = isThreat ? 11.5 : 3.8;
+    for (const cloud of this.clouds) {
+      cloud.position.z += cloudDrift * dt;
+      if (cloud.position.z > this.playerZ + 60) {
+        cloud.position.z = this.playerZ - 200 - Math.random() * 50;
+        cloud.position.x = -45 + Math.random() * 90;
+      }
+    }
+
+    // Distant mountain ridge parallax
+    this.mountainRidge.position.z = this.playerZ * 0.28;
+
+    // Coastal lighthouse rotation & recycling along endless coast
+    this.lighthouseRig.beamGroup.rotation.y += dt * 1.55;
+    if (this.lighthouseRig.group.position.z > this.playerZ + 60) {
+      this.lighthouseRig.group.position.z = this.playerZ - 280;
+    }
+
+    // Coastal seagulls flight dynamics & storm evacuation
+    for (let i = 0; i < this.seagulls.length; i++) {
+      const gull = this.seagulls[i];
+      gull.flapPhase += gull.flapSpeed * dt;
+      gull.leftWing.rotation.z = 0.12 + Math.sin(gull.flapPhase) * 0.38;
+      gull.rightWing.rotation.z = -0.12 - Math.sin(gull.flapPhase) * 0.38;
+
+      if (isThreat) {
+        // Fleeing inland toward the beach (+X) and speeding ahead
+        gull.group.position.x += 4.5 * dt;
+        gull.group.position.z -= (this.speed + 8.5) * dt;
+        gull.group.rotation.y = 0.32;
+      } else {
+        // Tranquil cruising along coast
+        gull.group.position.z -= (this.speed * 0.55 + 3.2) * dt;
+        gull.group.position.x += Math.sin(elapsedSec * 0.8 + i) * 0.04;
+        gull.group.rotation.y = Math.sin(elapsedSec * 0.6 + i) * 0.15;
+      }
+
+      if (gull.group.position.z > this.playerZ + 25) {
+        gull.group.position.z = this.playerZ - 130 - Math.random() * 35;
+        gull.group.position.x = -12 + Math.random() * 18;
+      } else if (gull.group.position.z < this.playerZ - 170) {
+        gull.group.position.z = this.playerZ - 25;
+      }
+    }
 
     // Quiet companion ghost pelicans
     this.companions.forEach((comp, idx) => {
@@ -1043,36 +1194,67 @@ export class PelicanScene {
         ? (6 - this.waveGap) * 0.03 * Math.sin(elapsedSec * 32)
         : 0;
 
-    // Action 3/4 coastal perspective: elevated on the right beach shoulder,
-    // giving an epic unobstructed view across the pelican towards the towering 11m ocean wave and road ahead!
-    const targetCamPos = isThreat
-      ? new THREE.Vector3(
-          this.playerX * 0.35 + 5.6 + shake,
-          4.0 + Math.abs(shake) * 0.3,
-          this.playerZ + 5.8,
-        )
-      : new THREE.Vector3(
-          this.playerX * 0.5 + 0.4,
-          4.4,
-          this.playerZ + 8.6,
-        );
-    this.camera.position.lerp(targetCamPos, Math.min(1, 5.5 * dt));
+    let targetCamPos: THREE.Vector3;
+    let targetLook: THREE.Vector3;
 
-    const targetLook = isThreat
-      ? new THREE.Vector3(
-          this.playerX * 0.25 - 2.8,
-          1.5,
-          this.playerZ - 9.5,
-        )
-      : new THREE.Vector3(
-          this.playerX * 0.4,
-          1.35,
-          this.playerZ - 12.0,
-        );
+    if (this.cameraMode === 'chill') {
+      // Over-the-shoulder seaside cruising camera: closer, lower, relaxing feel
+      targetCamPos = new THREE.Vector3(
+        this.playerX * 0.75 + 0.35 + shake * 0.5,
+        2.9 + (isThreat ? Math.abs(shake) * 0.2 : 0),
+        this.playerZ + 5.6,
+      );
+      targetLook = new THREE.Vector3(
+        this.playerX * 0.82,
+        1.65,
+        this.playerZ - 11.0,
+      );
+    } else if (this.cameraMode === 'drone') {
+      // Panoramic aerial drone overview: high angle viewing coast, waves, and pelican
+      targetCamPos = new THREE.Vector3(
+        this.playerX * 0.35 + 9.2 + shake,
+        14.0 + (isThreat ? Math.abs(shake) * 0.3 : 0),
+        this.playerZ + 14.5,
+      );
+      targetLook = new THREE.Vector3(
+        this.playerX * 0.45 - 2.2,
+        1.2,
+        this.playerZ - 8.0,
+      );
+    } else {
+      // Action 3/4 coastal perspective (default): elevated on the right beach shoulder,
+      // giving an epic unobstructed view across the pelican towards the towering 11m ocean wave and road ahead!
+      targetCamPos = isThreat
+        ? new THREE.Vector3(
+            this.playerX * 0.35 + 5.6 + shake,
+            4.0 + Math.abs(shake) * 0.3,
+            this.playerZ + 5.8,
+          )
+        : new THREE.Vector3(
+            this.playerX * 0.5 + 0.4,
+            4.4,
+            this.playerZ + 8.6,
+          );
+      targetLook = isThreat
+        ? new THREE.Vector3(
+            this.playerX * 0.25 - 2.8,
+            1.5,
+            this.playerZ - 9.5,
+          )
+        : new THREE.Vector3(
+            this.playerX * 0.4,
+            1.35,
+            this.playerZ - 12.0,
+          );
+    }
+
+    const camLerpSpeed = this.cameraMode === 'drone' ? 4.2 : 5.5;
+    this.camera.position.lerp(targetCamPos, Math.min(1, camLerpSpeed * dt));
     this.cameraLookAt.lerp(targetLook, Math.min(1, 6.5 * dt));
     this.camera.lookAt(this.cameraLookAt);
 
-    const desiredFov = this.boostTimer > 0 ? 62 : isThreat ? 58 : 53;
+    const baseFov = this.cameraMode === 'drone' ? 52 : this.cameraMode === 'chill' ? 56 : 53;
+    const desiredFov = this.boostTimer > 0 ? baseFov + 8 : isThreat ? baseFov + 5 : baseFov;
     if (Math.abs(this.camera.fov - desiredFov) > 0.05) {
       this.camera.fov += (desiredFov - this.camera.fov) * Math.min(1, 4 * dt);
       this.camera.updateProjectionMatrix();
@@ -1130,6 +1312,24 @@ export class PelicanScene {
     }
   }
 
+  public setCameraMode(mode: 'action' | 'chill' | 'drone'): void {
+    this.cameraMode = mode;
+    const modeNames = {
+      action: '追焦视角 (Action 3/4)',
+      chill: '巡航视角 (Chill Ride)',
+      drone: '全景天眼 (Aerial Drone)',
+    };
+    this.bannerText = `📹 已切换视角: ${modeNames[mode]}`;
+    this.bannerTimer = 1.8;
+    this.emitHud();
+  }
+
+  public cycleCameraMode(): void {
+    const modes: ('action' | 'chill' | 'drone')[] = ['action', 'chill', 'drone'];
+    const nextIdx = (modes.indexOf(this.cameraMode) + 1) % modes.length;
+    this.setCameraMode(modes[nextIdx]);
+  }
+
   private emitHud(): void {
     const tier = getTierForLevel(this.level);
     this.onHudUpdate({
@@ -1153,6 +1353,7 @@ export class PelicanScene {
       pickups: { ...this.pickups },
       bannerText: this.bannerText,
       todayWaveSeedLabel: this.disasterMeta.seedLabel,
+      cameraMode: this.cameraMode,
     });
   }
 
@@ -1168,6 +1369,8 @@ export class PelicanScene {
     if (this.rafId !== null) window.cancelAnimationFrame(this.rafId);
     this.resizeObserver.disconnect();
     coastalAudio.stopSiren();
+    coastalAudio.stopWaveRoar();
+    coastalAudio.stopCalmSurf();
     this.renderer.dispose();
     if (this.renderer.domElement.parentElement === this.container) {
       this.container.removeChild(this.renderer.domElement);

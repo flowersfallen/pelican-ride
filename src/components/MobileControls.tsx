@@ -45,6 +45,9 @@ export function MobileControls({
             <kbd className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[11px]">← →</kbd> 左右转向
           </span>
           <span>
+            <kbd className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[11px]">C</kbd> 切换视角
+          </span>
+          <span>
             <kbd className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[11px]">Space</kbd> 叮铃
           </span>
         </div>

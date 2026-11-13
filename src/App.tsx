@@ -28,6 +28,7 @@ const INITIAL_HUD: GameHudState = {
   pickups: { fish: 0, shrimp: 0, starfish: 0, seaweed: 0 },
   bannerText: null,
   todayWaveSeedLabel: '今日潮汐扰动 · 随机突袭',
+  cameraMode: 'action',
 };
 
 export function App() {
@@ -73,6 +74,10 @@ export function App() {
         engineRef.current?.triggerBell();
         return;
       }
+      if ((e.code === 'KeyC' || e.code === 'KeyV') && !e.repeat) {
+        engineRef.current?.cycleCameraMode();
+        return;
+      }
       if (e.code === 'Enter' && hud.isGameOver) {
         engineRef.current?.restart(false);
         return;
@@ -111,6 +116,10 @@ export function App() {
     engineRef.current?.triggerBell();
   }, []);
 
+  const handleCycleCamera = useCallback(() => {
+    engineRef.current?.cycleCameraMode();
+  }, []);
+
   const handleTriggerTsunami = useCallback(() => {
     coastalAudio.unlock();
     engineRef.current?.triggerManualTsunami();
@@ -143,6 +152,7 @@ export function App() {
         onToggleMute={handleToggleMute}
         onRerollPelican={handleRerollPelican}
         onRingBell={handleRingBell}
+        onCycleCamera={handleCycleCamera}
       />
 
       {/* PC Keyboard Guide & Mobile Touch Controls */}

@@ -959,3 +959,174 @@ export function createTsunamiWallMesh(): TsunamiRig {
     sprayOrigin: new THREE.Vector3(-8.0, 9.5, 0),
   };
 }
+
+export interface SeagullRig {
+  group: THREE.Group;
+  leftWing: THREE.Mesh;
+  rightWing: THREE.Mesh;
+  flapSpeed: number;
+  flapPhase: number;
+}
+
+export function createCloudMesh(): THREE.Group {
+  const group = new THREE.Group();
+  const cloudMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.85,
+    flatShading: true,
+  });
+
+  const puffCount = 4 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < puffCount; i++) {
+    const r = 2.4 + Math.random() * 2.6;
+    const geo = new THREE.DodecahedronGeometry(r, 1);
+    const puff = new THREE.Mesh(geo, cloudMat);
+    puff.position.set(
+      (i - puffCount / 2) * 3.2 + (Math.random() - 0.5) * 1.5,
+      (Math.random() - 0.5) * 1.2,
+      (Math.random() - 0.5) * 2.0,
+    );
+    group.add(puff);
+  }
+  return group;
+}
+
+export function createSeagullMesh(): SeagullRig {
+  const group = new THREE.Group();
+  const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, flatShading: true });
+  const beakMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, flatShading: true });
+  const wingtipMat = new THREE.MeshStandardMaterial({ color: 0x475569, flatShading: true });
+
+  // Body
+  const body = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.85, 5), whiteMat);
+  body.rotation.x = Math.PI / 2;
+  group.add(body);
+
+  // Beak
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.28, 4), beakMat);
+  beak.rotation.x = -Math.PI / 2;
+  beak.position.set(0, 0.02, -0.52);
+  group.add(beak);
+
+  // Wings (hinged groups)
+  const leftWing = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.04, 0.22), whiteMat);
+  leftWing.position.set(-0.42, 0.06, 0);
+  const leftTip = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.03, 0.18), wingtipMat);
+  leftTip.position.set(-0.52, 0.01, 0.02);
+  leftWing.add(leftTip);
+  group.add(leftWing);
+
+  const rightWing = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.04, 0.22), whiteMat);
+  rightWing.position.set(0.42, 0.06, 0);
+  const rightTip = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.03, 0.18), wingtipMat);
+  rightTip.position.set(0.52, 0.01, 0.02);
+  rightWing.add(rightTip);
+  group.add(rightWing);
+
+  return {
+    group,
+    leftWing,
+    rightWing,
+    flapSpeed: 7 + Math.random() * 3,
+    flapPhase: Math.random() * Math.PI * 2,
+  };
+}
+
+export interface LighthouseRig {
+  group: THREE.Group;
+  beamGroup: THREE.Group;
+}
+
+export function createLighthouseMesh(): LighthouseRig {
+  const group = new THREE.Group();
+
+  const redMat = new THREE.MeshStandardMaterial({ color: 0xe11d48, flatShading: true });
+  const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, flatShading: true });
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9, flatShading: true });
+  const glassMat = new THREE.MeshStandardMaterial({
+    color: 0xfef08a,
+    emissive: 0xfacc15,
+    emissiveIntensity: 0.8,
+    roughness: 0.1,
+  });
+
+  // Rocky base reef
+  const reef = new THREE.Mesh(new THREE.DodecahedronGeometry(6.5, 1), rockMat);
+  reef.scale.set(1.4, 0.6, 1.4);
+  reef.position.set(0, 1.2, 0);
+  group.add(reef);
+
+  // Cylindrical tower rings (red and white stripes)
+  const ringCount = 6;
+  const towerHeight = 16;
+  for (let i = 0; i < ringCount; i++) {
+    const bottomR = 2.4 - i * 0.18;
+    const topR = 2.4 - (i + 1) * 0.18;
+    const ringH = towerHeight / ringCount;
+    const seg = new THREE.Mesh(
+      new THREE.CylinderGeometry(topR, bottomR, ringH, 10),
+      i % 2 === 0 ? whiteMat : redMat,
+    );
+    seg.position.set(0, 3.2 + i * ringH + ringH / 2, 0);
+    seg.castShadow = true;
+    group.add(seg);
+  }
+
+  // Lantern room balcony & roof
+  const lanternY = 3.2 + towerHeight;
+  const balcony = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.9, 0.4, 12), redMat);
+  balcony.position.set(0, lanternY, 0);
+  group.add(balcony);
+
+  const lantern = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 1.6, 8), glassMat);
+  lantern.position.set(0, lanternY + 0.9, 0);
+  group.add(lantern);
+
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(1.7, 1.6, 8), redMat);
+  roof.position.set(0, lanternY + 2.4, 0);
+  group.add(roof);
+
+  // Rotating light beam cones
+  const beamGroup = new THREE.Group();
+  beamGroup.position.set(0, lanternY + 0.9, 0);
+
+  const beamMat = new THREE.MeshBasicMaterial({
+    color: 0xfef08a,
+    transparent: true,
+    opacity: 0.32,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+
+  // 2 opposing beams
+  [-1, 1].forEach((dir) => {
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(5.5, 38, 12, 1, true), beamMat);
+    cone.rotation.z = (dir * Math.PI) / 2;
+    cone.position.set(dir * 19, 0, 0);
+    beamGroup.add(cone);
+  });
+
+  group.add(beamGroup);
+
+  return { group, beamGroup };
+}
+
+export function createMountainRidge(): THREE.Group {
+  const group = new THREE.Group();
+  const mountainMat = new THREE.MeshStandardMaterial({
+    color: 0x1e293b,
+    roughness: 0.95,
+    flatShading: true,
+  });
+
+  for (let i = 0; i < 7; i++) {
+    const h = 18 + Math.random() * 16;
+    const r = 22 + Math.random() * 14;
+    const peak = new THREE.Mesh(new THREE.ConeGeometry(r, h, 6), mountainMat);
+    peak.position.set(-85 - Math.random() * 25, h / 2 - 2, -180 + i * 45);
+    peak.rotation.y = i * 0.8;
+    group.add(peak);
+  }
+
+  return group;
+}

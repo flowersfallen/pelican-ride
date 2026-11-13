@@ -60,4 +60,5 @@ export interface GameHudState {
   pickups: PickupCounts;
   bannerText: string | null;
   todayWaveSeedLabel: string;
+  cameraMode: 'action' | 'chill' | 'drone';
 }

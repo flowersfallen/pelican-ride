@@ -10,6 +10,9 @@ class CoastalAudioEngine {
   private sirenTimer: number | null = null;
   private waveRoarGain: GainNode | null = null;
   private waveRoarSource: AudioBufferSourceNode | null = null;
+  private surfSource: AudioBufferSourceNode | null = null;
+  private surfGain: GainNode | null = null;
+  private surfCycleTimer: number | null = null;
 
   public isMuted(): boolean {
     return this.muted;
@@ -20,6 +23,7 @@ class CoastalAudioEngine {
     if (muted) {
       this.stopSiren();
       this.stopWaveRoar();
+      this.stopCalmSurf();
     }
   }
 
@@ -221,9 +225,113 @@ class CoastalAudioEngine {
     }
   }
 
+  public startCalmSurf(): void {
+    if (this.muted || this.surfSource) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      const bufferSize = this.ctx.sampleRate * 3;
+      const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      let lastOut = 0.0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        output[i] = (lastOut + 0.02 * white) / 1.02;
+        lastOut = output[i];
+        output[i] *= 2.8;
+      }
+
+      const source = this.ctx.createBufferSource();
+      source.buffer = noiseBuffer;
+      source.loop = true;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(320, this.ctx.currentTime);
+
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.025, this.ctx.currentTime);
+
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      source.start();
+      this.surfSource = source;
+      this.surfGain = gain;
+
+      // Gentle wave cycle: slow rise and fall every 4.8 seconds
+      const cycle = () => {
+        if (!this.surfGain || !this.ctx || this.muted) return;
+        const t = this.ctx.currentTime;
+        this.surfGain.gain.setValueAtTime(0.015, t);
+        this.surfGain.gain.linearRampToValueAtTime(0.045, t + 2.2);
+        this.surfGain.gain.linearRampToValueAtTime(0.015, t + 4.8);
+      };
+      cycle();
+      this.surfCycleTimer = window.setInterval(cycle, 4800);
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public stopCalmSurf(): void {
+    if (this.surfCycleTimer !== null) {
+      window.clearInterval(this.surfCycleTimer);
+      this.surfCycleTimer = null;
+    }
+    if (this.surfSource) {
+      try {
+        if (this.surfGain && this.ctx) {
+          this.surfGain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.4);
+        }
+        setTimeout(() => {
+          try {
+            this.surfSource?.stop();
+            this.surfSource?.disconnect();
+          } catch {
+            // Already stopped
+          }
+          this.surfSource = null;
+          this.surfGain = null;
+        }, 450);
+      } catch {
+        this.surfSource = null;
+        this.surfGain = null;
+      }
+    }
+  }
+
+  public playWhoosh(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(180, now);
+      osc.frequency.exponentialRampToValueAtTime(560, now + 0.18);
+      osc.frequency.exponentialRampToValueAtTime(140, now + 0.45);
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.09, now + 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.5);
+    } catch {
+      // Audio fallback
+    }
+  }
+
   public playGameOver(): void {
     this.stopSiren();
     this.stopWaveRoar();
+    this.stopCalmSurf();
     if (this.muted) return;
     this.unlock();
     if (!this.ctx) return;

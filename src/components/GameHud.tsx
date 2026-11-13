@@ -1,5 +1,6 @@
 import {
   Bell,
+  Camera,
   Compass,
   RefreshCw,
   Shield,
@@ -16,6 +17,7 @@ interface GameHudProps {
   onToggleMute: () => void;
   onRerollPelican: () => void;
   onRingBell: () => void;
+  onCycleCamera: () => void;
 }
 
 export function GameHud({
@@ -24,6 +26,7 @@ export function GameHud({
   onToggleMute,
   onRerollPelican,
   onRingBell,
+  onCycleCamera,
 }: GameHudProps) {
   const isWarning = hud.disasterPhase === 'warning';
   const isActive = hud.disasterPhase === 'active';
@@ -118,6 +121,19 @@ export function GameHud({
             >
               <Bell className="w-3.5 h-3.5" />
               <span>叮</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onCycleCamera}
+              aria-label="切换摄像机视角"
+              className="inline-flex items-center gap-1 rounded-xl border border-white/30 bg-slate-950/60 hover:bg-slate-900/80 text-sky-200 px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold shadow-md backdrop-blur transition-colors"
+              title="切换摄像机视角 (追焦 / 巡航 / 全景天眼) [快捷键 C]"
+            >
+              <Camera className="w-3.5 h-3.5 text-sky-300" />
+              <span>
+                {hud.cameraMode === 'chill' ? '巡航' : hud.cameraMode === 'drone' ? '天眼' : '追焦'}
+              </span>
             </button>
 
             <button
