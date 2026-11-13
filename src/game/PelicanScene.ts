@@ -80,6 +80,7 @@ export class PelicanScene {
   private shallowFloodMesh!: THREE.Mesh;
   private tsunamiRig!: TsunamiRig;
   private sailboats: THREE.Group[] = [];
+  private palmTrees: THREE.Group[] = [];
   private companions: CompanionEntity[] = [];
   private collectibles: CollectibleEntity[] = [];
   private particles: PopParticle[] = [];
@@ -222,18 +223,43 @@ export class PelicanScene {
     this.foamStrip.position.set(-7.6, -0.18, -80);
     this.scene.add(this.foamStrip);
 
-    // Shallow flood overlay over seaward lanes during active tsunami
+    // Shallow flood overlay over seaward lanes with organic undulating puddle/tongue contours
+    const floodSteps = 80;
+    const floodPositions: number[] = [];
+    const floodIndices: number[] = [];
+    const floodLen = 320;
+    for (let i = 0; i <= floodSteps; i++) {
+      const z = -floodLen / 2 + (i / floodSteps) * floodLen;
+      const xLeft = -ROAD_HALF_WIDTH - 0.4;
+      // Wavy tongue reaching into center lane with natural fluid scallops
+      const xRight = -ROAD_HALF_WIDTH + 3.2 + Math.sin(i * 0.45) * 1.4 + Math.cos(i * 1.1) * 0.8;
+      floodPositions.push(xLeft, 0.035, z);
+      floodPositions.push(xRight, 0.035, z);
+    }
+    for (let i = 0; i < floodSteps; i++) {
+      const a = i * 2;
+      const b = a + 1;
+      const c = a + 2;
+      const d = a + 3;
+      floodIndices.push(a, b, c);
+      floodIndices.push(c, b, d);
+    }
+    const floodGeo = new THREE.BufferGeometry();
+    floodGeo.setAttribute('position', new THREE.Float32BufferAttribute(floodPositions, 3));
+    floodGeo.setIndex(floodIndices);
+    floodGeo.computeVertexNormals();
+
     this.shallowFloodMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(5.6, 300),
+      floodGeo,
       new THREE.MeshBasicMaterial({
         color: 0x38bdf8,
         transparent: true,
         opacity: 0,
         depthWrite: false,
+        side: THREE.DoubleSide,
       }),
     );
-    this.shallowFloodMesh.rotation.x = -Math.PI / 2;
-    this.shallowFloodMesh.position.set(-4.3, 0.04, -80);
+    this.shallowFloodMesh.position.set(0, 0, -80);
     this.scene.add(this.shallowFloodMesh);
 
     // Recycled Coastal Boardwalk Segments
@@ -314,6 +340,7 @@ export class PelicanScene {
       palm.position.set(ROAD_HALF_WIDTH + 2.8 + (i % 3) * 1.6, 0, -3.5);
       palm.rotation.y = i * 1.1;
       seg.add(palm);
+      this.palmTrees.push(palm);
 
       if (i % 3 === 1) {
         const umbPole = new THREE.Mesh(
@@ -421,6 +448,7 @@ export class PelicanScene {
     this.submergedTimer = 0;
     this.tsunamiRig.group.visible = false;
     coastalAudio.stopSiren();
+    coastalAudio.stopWaveRoar();
   }
 
   public setInput(patch: Partial<InputState>): void {
@@ -510,6 +538,7 @@ export class PelicanScene {
     this.bannerText = '🌊 海啸来袭！按住前进加速，吃鱼虾海星逃离巨浪！';
     this.bannerTimer = 4.0;
     coastalAudio.stopSiren();
+    coastalAudio.startWaveRoar();
   }
 
   private enterRecedingPhase(): void {
@@ -519,6 +548,7 @@ export class PelicanScene {
     this.bannerText = '☀️ 海啸退潮了！海岸恢复平静，继续惬意慢骑吧';
     this.bannerTimer = 3.4;
     coastalAudio.stopSiren();
+    coastalAudio.stopWaveRoar();
   }
 
   private spawnWaveCollectiblesBatch(count: number): void {
@@ -612,6 +642,39 @@ export class PelicanScene {
           -14 - Math.random() * 8,
         ),
         life: 0.45,
+      });
+    }
+
+    // Seawall impact splash plumes where giant wave strikes coastal barrier
+    if (Math.random() < 0.65) {
+      const plume = new THREE.Mesh(geo, sprayMat);
+      const plumeZ = this.playerZ - 10 + (Math.random() - 0.5) * 28;
+      plume.position.set(-6.8, 1.2 + Math.random() * 2.5, plumeZ);
+      this.scene.add(plume);
+      this.particles.push({
+        mesh: plume,
+        vel: new THREE.Vector3(
+          4.8 + Math.random() * 4.0, // Blasts right across road
+          4.2 + Math.random() * 3.8, // Erupts skyward
+          (Math.random() - 0.5) * 5,
+        ),
+        life: 0.55,
+      });
+    }
+
+    // Bike tire water spray when cycling on wet road during tsunami
+    if (this.speed > 5 && Math.random() < 0.7) {
+      const tireDrop = new THREE.Mesh(geo, sprayMat);
+      tireDrop.position.set(this.playerX + (Math.random() - 0.5) * 0.25, 0.12, this.playerZ + 0.65);
+      this.scene.add(tireDrop);
+      this.particles.push({
+        mesh: tireDrop,
+        vel: new THREE.Vector3(
+          (Math.random() - 0.5) * 3.0,
+          1.8 + Math.random() * 2.2,
+          7.5 + Math.random() * 4.5, // Sprays backward behind bike
+        ),
+        life: 0.32,
       });
     }
   }
@@ -831,15 +894,16 @@ export class PelicanScene {
         clip.rotation.y = Math.sin(elapsedSec * 5 + idx * 0.4) * 0.25;
       });
 
-      // Surging road water wash & foam edge
+      // Surging road water wash & foam edge undulating back and forth
       if (this.tsunamiRig.waterTongues.length >= 2) {
-        const washSurge = Math.sin(elapsedSec * 7) * 1.6;
-        this.tsunamiRig.waterTongues[0].position.z = -5.2 - washSurge;
-        this.tsunamiRig.waterTongues[1].position.z = -8.8 - washSurge * 1.25;
+        const washSurge = Math.sin(elapsedSec * 6.5) * 1.2;
+        this.tsunamiRig.waterTongues[0].position.z = -washSurge;
+        this.tsunamiRig.waterTongues[1].position.z = -washSurge * 1.15;
       }
 
       // Continuous sea spray particles flying forward from the wave crest
       this.spawnTsunamiSpray(this.playerZ + this.waveGap);
+      coastalAudio.updateWaveRoar(this.waveGap);
 
       if (this.waveGap <= 0.75) {
         this.submergedTimer += dt;
@@ -885,18 +949,35 @@ export class PelicanScene {
     (this.shallowFloodMesh.material as THREE.MeshBasicMaterial).opacity = this.floodOpacity;
 
     // Sky atmosphere shift during warning / active tsunami
-    const targetSky =
-      this.disasterPhase === 'calm' || this.disasterPhase === 'receding'
-        ? this.skyCalmColor
-        : this.skyAlertColor;
+    const isThreat = this.disasterPhase === 'warning' || this.disasterPhase === 'active';
+    const targetSky = isThreat ? this.skyAlertColor : this.skyCalmColor;
     this.skyCurrentColor.lerp(targetSky, Math.min(1, 1.5 * dt));
     (this.scene.background as THREE.Color).copy(this.skyCurrentColor);
     (this.scene.fog as THREE.FogExp2).color.copy(this.skyCurrentColor);
+
+    // Dynamic storm ambient lighting: in calm weather, warm golden sand ground reflection;
+    // in tsunami, deep oceanic azure reflection so water remains crystal pure sea blue!
+    const targetGround = isThreat ? new THREE.Color(0x0369a1) : new THREE.Color(0xfde68a);
+    const targetSkyLight = isThreat ? new THREE.Color(0x94a3b8) : new THREE.Color(0xe0f2fe);
+    this.hemiLight.groundColor.lerp(targetGround, Math.min(1, 2.5 * dt));
+    this.hemiLight.color.lerp(targetSkyLight, Math.min(1, 2.5 * dt));
 
     // Sailboats gently cruise with world
     this.sailboats.forEach((boat, idx) => {
       boat.position.z = this.playerZ - 45 - idx * 45 + Math.sin(elapsedSec * 0.4 + idx) * 6;
       boat.rotation.z = Math.sin(elapsedSec * 1.4 + idx) * 0.05;
+    });
+
+    // Coastal palm trees: gentle breeze in calm, fierce storm wind whipping during tsunami
+    const isStorm = this.disasterPhase === 'active' || this.disasterPhase === 'warning';
+    this.palmTrees.forEach((palm, idx) => {
+      if (isStorm) {
+        palm.rotation.z = -0.22 + Math.sin(elapsedSec * 9.5 + idx * 1.2) * 0.12;
+        palm.rotation.x = Math.sin(elapsedSec * 7.5 + idx * 0.8) * 0.08;
+      } else {
+        palm.rotation.z = Math.sin(elapsedSec * 1.8 + idx * 0.6) * 0.04;
+        palm.rotation.x = Math.cos(elapsedSec * 1.5 + idx * 0.4) * 0.03;
+      }
     });
 
     // Quiet companion ghost pelicans
@@ -957,7 +1038,6 @@ export class PelicanScene {
     this.sunLight.position.set(this.playerX + 18, 28, this.playerZ + 12);
     this.sunLight.target.position.set(this.playerX, 0, this.playerZ - 12);
 
-    const isThreat = this.disasterPhase === 'active' || this.disasterPhase === 'warning';
     const shake =
       this.disasterPhase === 'active' && this.waveGap < 6
         ? (6 - this.waveGap) * 0.03 * Math.sin(elapsedSec * 32)

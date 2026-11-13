@@ -551,15 +551,15 @@ export interface TsunamiRig {
 export function createTsunamiWallMesh(): TsunamiRig {
   const group = new THREE.Group();
 
-  // Water materials (glossy, translucent, oceanic)
+  // Water materials (glossy, translucent, pure oceanic azure)
   const oceanWaterMat = new THREE.MeshStandardMaterial({
-    color: 0x06b6d4,
-    emissive: 0x0284c7,
-    emissiveIntensity: 0.35,
-    roughness: 0.1,
-    metalness: 0.1,
+    color: 0x0284c7, // Vibrant deep azure / cerulean ocean
+    emissive: 0x0891b2, // Glowing tropical ocean cyan emissive
+    emissiveIntensity: 0.45,
+    roughness: 0.08,
+    metalness: 0.14,
     transparent: true,
-    opacity: 0.88,
+    opacity: 0.93,
     side: THREE.DoubleSide,
     flatShading: false, // Smooth shading for authentic liquid look
   });
@@ -567,7 +567,7 @@ export function createTsunamiWallMesh(): TsunamiRig {
   const foamMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     emissive: 0xf0fdf4,
-    emissiveIntensity: 0.35,
+    emissiveIntensity: 0.45,
     roughness: 0.75,
     flatShading: true,
     side: THREE.DoubleSide,
@@ -576,11 +576,11 @@ export function createTsunamiWallMesh(): TsunamiRig {
   const roadWashMat = new THREE.MeshStandardMaterial({
     color: 0x38bdf8,
     emissive: 0x0284c7,
-    emissiveIntensity: 0.3,
-    roughness: 0.12,
+    emissiveIntensity: 0.35,
+    roughness: 0.1,
     metalness: 0.08,
     transparent: true,
-    opacity: 0.72,
+    opacity: 0.75,
     side: THREE.DoubleSide,
   });
 
@@ -607,7 +607,7 @@ export function createTsunamiWallMesh(): TsunamiRig {
       // Smooth organic longitudinal taper: 0 at ends, 1 in the mid-swell
       const zTaper = Math.sin(u * Math.PI);
       const taperFactor = Math.pow(Math.max(0, zTaper), 0.55);
-      const waveH = (11.0 + Math.sin(u * Math.PI * 3 + 0.4) * 1.3) * taperFactor;
+      const waveH = (11.2 + Math.sin(u * Math.PI * 3 + 0.4) * 1.3) * taperFactor;
 
       let x = 0;
       let y = 0;
@@ -620,8 +620,8 @@ export function createTsunamiWallMesh(): TsunamiRig {
       } else {
         // Authentic curling barrel lip (hooks over towards the road and curves down)
         const t = (v - 0.68) / 0.32;
-        y = waveH * (0.78 + Math.sin(t * Math.PI * 0.5) * 0.24) - t * t * 1.6 * taperFactor;
-        x = -14 + t * 6.4; // hooks over to -7.6 right above coastal seawall
+        y = waveH * (0.78 + Math.sin(t * Math.PI * 0.5) * 0.24) - t * t * 1.65 * taperFactor;
+        x = -14 + t * 6.8; // hooks over to -7.2 right above coastal seawall
       }
 
       // Add natural living ocean ripples & ribbing
@@ -673,24 +673,24 @@ export function createTsunamiWallMesh(): TsunamiRig {
     const zTaper = Math.sin(u * Math.PI);
     const z = zMin + u * (zMax - zMin);
     const taperFactor = Math.pow(Math.max(0, zTaper), 0.55);
-    const waveH = (11.0 + Math.sin(u * Math.PI * 3 + 0.4) * 1.3) * taperFactor;
+    const waveH = (11.2 + Math.sin(u * Math.PI * 3 + 0.4) * 1.3) * taperFactor;
     const scale = Math.min(1.0, zTaper * 1.4);
 
     // Lip center position
-    const lipX = -7.6 + Math.cos(z * 0.2) * 0.35 * taperFactor;
+    const lipX = -7.4 + Math.cos(z * 0.2) * 0.35 * taperFactor;
     const lipY = waveH * 0.92;
 
     // Inner foam rim (on wave shoulder)
-    const inX = lipX - 1.4 * scale;
-    const inY = lipY + 0.35 * scale;
+    const inX = lipX - 1.5 * scale;
+    const inY = lipY + 0.38 * scale;
 
     // Outer foam fringe (curling down and forward with scalloped scalloping)
-    const scallop = 0.5 + Math.sin(i * 1.8) * 0.28 + Math.cos(i * 3.4) * 0.15;
-    const outX = lipX + 0.7 * scale;
-    const outY = lipY - (1.1 * scallop) * scale;
+    const scallop = 0.55 + Math.sin(i * 1.9) * 0.3 + Math.cos(i * 3.5) * 0.16;
+    const outX = lipX + 0.85 * scale;
+    const outY = lipY - (1.25 * scallop) * scale;
 
-    ribbonPositions.push(inX, Math.max(0.01, inY), z);
-    ribbonPositions.push(outX, Math.max(0.01, outY), z);
+    ribbonPositions.push(inX, Math.max(0.01, inY), z + 0.2 * scale);
+    ribbonPositions.push(outX, Math.max(0.01, outY), z - (0.6 * scallop) * scale);
     ribbonUvs.push(u, 0);
     ribbonUvs.push(u, 1);
   }
@@ -719,13 +719,13 @@ export function createTsunamiWallMesh(): TsunamiRig {
     const u = 0.25 + (i / 21) * 0.5; // only near peak
     const zTaper = Math.sin(u * Math.PI);
     const z = zMin + u * (zMax - zMin);
-    const waveH = (11.0 + Math.sin(u * Math.PI * 3 + 0.4) * 1.3) * Math.pow(zTaper, 0.55);
+    const waveH = (11.2 + Math.sin(u * Math.PI * 3 + 0.4) * 1.3) * Math.pow(zTaper, 0.55);
 
     const clump = new THREE.Mesh(
       new THREE.SphereGeometry(0.48 + (i % 3) * 0.18, 6, 6),
       foamMat,
     );
-    clump.position.set(-8.0 + (i % 2 === 0 ? 0.3 : -0.2), waveH - 0.1, z);
+    clump.position.set(-7.8 + (i % 2 === 0 ? 0.3 : -0.2), waveH - 0.1, z);
     group.add(clump);
     foamClips.push(clump);
   }
@@ -833,26 +833,115 @@ export function createTsunamiWallMesh(): TsunamiRig {
   group.add(rRibbonMesh);
 
   // ==========================================
-  // 4. SURGING ROAD WATER WASH (RUSHING TRANSIT SHEET OVER ASPHALT)
+  // 4. SURGING ROAD WATER WASH (ORGANIC SCALLOPED FLOOD SHEET OVER ASPHALT)
   // ==========================================
-  // Flat translucent water sheet extending in front of the breaker across asphalt
+  // Dynamic, organic fluid wash grid across the highway (no more flat ruler line!)
   const waterTongues: THREE.Mesh[] = [];
-  const roadWash = new THREE.Mesh(
-    new THREE.PlaneGeometry(13.5, 7.5, 8, 8),
-    roadWashMat,
-  );
-  roadWash.rotation.x = -Math.PI / 2;
-  roadWash.position.set(0, 0.05, -5.2);
+  const washCols = 26; // along X
+  const washRows = 14; // along Z
+  const washXMin = -6.8;
+  const washXMax = 6.4;
+
+  const washPositions: number[] = [];
+  const washIndices: number[] = [];
+  const washUvs: number[] = [];
+
+  for (let r = 0; r <= washRows; r++) {
+    const v = r / washRows; // 0 = at breaker face (z = -1.5), 1 = leading water tongues
+    for (let c = 0; c <= washCols; c++) {
+      const u = c / washCols;
+      const x = washXMin + u * (washXMax - washXMin);
+
+      // Organic wavy leading edge contour (reaches furthest on ocean side, undulating tongues)
+      const tongueReach =
+        -6.5 -
+        Math.sin(u * Math.PI * 3.5 + 0.3) * 1.5 -
+        Math.cos(u * 9.0) * 0.7 -
+        (1 - u) * 1.4;
+
+      const z = -1.5 * (1 - v) + tongueReach * v;
+      const y = 0.04 + Math.sin(x * 0.6 + v * 5) * 0.012;
+
+      washPositions.push(x, y, z);
+      washUvs.push(u, v);
+    }
+  }
+
+  for (let r = 0; r < washRows; r++) {
+    for (let c = 0; c < washCols; c++) {
+      const a = r * (washCols + 1) + c;
+      const b = a + 1;
+      const d = (r + 1) * (washCols + 1) + c;
+      const e = d + 1;
+      washIndices.push(a, d, b);
+      washIndices.push(b, d, e);
+    }
+  }
+
+  const washGeo = new THREE.BufferGeometry();
+  washGeo.setAttribute('position', new THREE.Float32BufferAttribute(washPositions, 3));
+  washGeo.setAttribute('uv', new THREE.Float32BufferAttribute(washUvs, 2));
+  washGeo.setIndex(washIndices);
+  washGeo.computeVertexNormals();
+
+  const roadWash = new THREE.Mesh(washGeo, roadWashMat);
+  roadWash.receiveShadow = true;
   group.add(roadWash);
   waterTongues.push(roadWash);
 
-  // Scalloped bubbly foam border along the rushing water leading edge
-  const foamEdge = new THREE.Mesh(
-    new THREE.PlaneGeometry(13.2, 0.9, 12, 2),
-    foamMat,
-  );
-  foamEdge.rotation.x = -Math.PI / 2;
-  foamEdge.position.set(0, 0.07, -8.8);
+  // Scalloped bubbly foam border hugging the undulating leading water tongues
+  const foamCols = 26;
+  const foamPositions: number[] = [];
+  const foamIndices: number[] = [];
+  const foamUvs: number[] = [];
+
+  for (let c = 0; c <= foamCols; c++) {
+    const u = c / foamCols;
+    const x = washXMin + u * (washXMax - washXMin);
+    const tongueReach =
+      -6.5 -
+      Math.sin(u * Math.PI * 3.5 + 0.3) * 1.5 -
+      Math.cos(u * 9.0) * 0.7 -
+      (1 - u) * 1.4;
+
+    const scallop = 0.45 + Math.sin(u * 22) * 0.22 + Math.cos(u * 14) * 0.12;
+
+    // Inner foam contour
+    foamPositions.push(x, 0.05, tongueReach + 0.4);
+    // Outer frothing scalloped lobe
+    foamPositions.push(x, 0.065, tongueReach - scallop);
+    foamUvs.push(u, 0);
+    foamUvs.push(u, 1);
+
+    // Bubbly foam bead clusters along leading fingers
+    if (c % 2 === 0) {
+      const bubble = new THREE.Mesh(
+        new THREE.SphereGeometry(0.22 + (c % 3) * 0.08, 6, 6),
+        foamMat,
+      );
+      bubble.scale.set(1.4, 0.4, 1.2);
+      bubble.position.set(x, 0.08, tongueReach - scallop * 0.5);
+      group.add(bubble);
+      foamClips.push(bubble);
+    }
+  }
+
+  for (let c = 0; c < foamCols; c++) {
+    const a = c * 2;
+    const b = a + 1;
+    const d = a + 2;
+    const e = a + 3;
+    foamIndices.push(a, b, d);
+    foamIndices.push(d, b, e);
+  }
+
+  const foamEdgeGeo = new THREE.BufferGeometry();
+  foamEdgeGeo.setAttribute('position', new THREE.Float32BufferAttribute(foamPositions, 3));
+  foamEdgeGeo.setAttribute('uv', new THREE.Float32BufferAttribute(foamUvs, 2));
+  foamEdgeGeo.setIndex(foamIndices);
+  foamEdgeGeo.computeVertexNormals();
+
+  const foamEdge = new THREE.Mesh(foamEdgeGeo, foamMat);
   group.add(foamEdge);
   waterTongues.push(foamEdge);
 

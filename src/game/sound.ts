@@ -8,6 +8,8 @@ class CoastalAudioEngine {
   private ctx: AudioContext | null = null;
   private muted = false;
   private sirenTimer: number | null = null;
+  private waveRoarGain: GainNode | null = null;
+  private waveRoarSource: AudioBufferSourceNode | null = null;
 
   public isMuted(): boolean {
     return this.muted;
@@ -17,6 +19,7 @@ class CoastalAudioEngine {
     this.muted = muted;
     if (muted) {
       this.stopSiren();
+      this.stopWaveRoar();
     }
   }
 
@@ -145,8 +148,82 @@ class CoastalAudioEngine {
     }
   }
 
+  public startWaveRoar(): void {
+    if (this.muted || this.waveRoarSource) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      // 2 seconds of pink/brownian noise for natural wave surf roar
+      const bufferSize = this.ctx.sampleRate * 2;
+      const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      let b0 = 0, b1 = 0, b2 = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        b0 = 0.99 * b0 + white * 0.05;
+        b1 = 0.95 * b1 + white * 0.1;
+        b2 = 0.85 * b2 + white * 0.2;
+        output[i] = (b0 + b1 + b2) * 0.35;
+      }
+
+      const source = this.ctx.createBufferSource();
+      source.buffer = noiseBuffer;
+      source.loop = true;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(260, this.ctx.currentTime);
+
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.01, this.ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.09, this.ctx.currentTime + 1.2);
+
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      source.start();
+      this.waveRoarSource = source;
+      this.waveRoarGain = gain;
+    } catch {
+      // AudioContext fallback
+    }
+  }
+
+  public updateWaveRoar(gapMeters: number): void {
+    if (!this.waveRoarGain || !this.ctx || this.muted) return;
+    const danger = Math.max(0, Math.min(1, (16 - gapMeters) / 14));
+    const targetGain = 0.04 + danger * 0.12;
+    this.waveRoarGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.15);
+  }
+
+  public stopWaveRoar(): void {
+    if (this.waveRoarSource) {
+      try {
+        if (this.waveRoarGain && this.ctx) {
+          this.waveRoarGain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.5);
+        }
+        setTimeout(() => {
+          try {
+            this.waveRoarSource?.stop();
+            this.waveRoarSource?.disconnect();
+          } catch {
+            // Already stopped
+          }
+          this.waveRoarSource = null;
+          this.waveRoarGain = null;
+        }, 550);
+      } catch {
+        this.waveRoarSource = null;
+        this.waveRoarGain = null;
+      }
+    }
+  }
+
   public playGameOver(): void {
     this.stopSiren();
+    this.stopWaveRoar();
     if (this.muted) return;
     this.unlock();
     if (!this.ctx) return;
