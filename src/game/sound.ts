@@ -441,6 +441,91 @@ class CoastalAudioEngine {
       // Audio fallback
     }
   }
+
+  public playThunder(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      const bufferSize = this.ctx.sampleRate * 1.5;
+      const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      let lastOut = 0.0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        output[i] = (lastOut + 0.04 * white) / 1.04;
+        lastOut = output[i];
+        output[i] *= 3.5;
+      }
+      const source = this.ctx.createBufferSource();
+      source.buffer = noiseBuffer;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(140, this.ctx.currentTime);
+      filter.frequency.exponentialRampToValueAtTime(45, this.ctx.currentTime + 1.4);
+
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.01, this.ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.18, this.ctx.currentTime + 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 1.45);
+
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
+      source.start();
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playJump(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(220, now);
+      osc.frequency.exponentialRampToValueAtTime(580, now + 0.22);
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.14, now + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.28);
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playLanding(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(160, now);
+      osc.frequency.exponentialRampToValueAtTime(50, now + 0.18);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.22);
+    } catch {
+      // Audio fallback
+    }
+  }
 }
 
 export const coastalAudio = new CoastalAudioEngine();

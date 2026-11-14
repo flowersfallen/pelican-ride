@@ -7,6 +7,7 @@ import {
   createCloudMesh,
   createCollectibleMesh,
   createDolphinMesh,
+  createJumpRampMesh,
   createLighthouseMesh,
   createMountainRidge,
   createPalmTreeMesh,
@@ -33,6 +34,7 @@ import {
   CollectibleType,
   DisasterPhase,
   GameHudState,
+  GraphicQuality,
   InputState,
   PelicanIdentity,
   PickupCounts,
@@ -105,6 +107,12 @@ export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
     desc: '累计按响车铃叮当 10 次！',
     icon: '🔔',
   },
+  stunt_rider: {
+    id: 'stunt_rider',
+    title: '特技飞跃',
+    desc: '冲上木质跳台腾空飞翔，施展特技！',
+    icon: '🦅',
+  },
 };
 
 export class PelicanScene {
@@ -146,6 +154,7 @@ export class PelicanScene {
   private starfield!: THREE.Points;
   private dolphins: DolphinRig[] = [];
   private roadSigns: THREE.Group[] = [];
+  private jumpRamps: THREE.Group[] = [];
   private cameraMode: 'action' | 'chill' | 'drone' = 'action';
   private lastWhooshTime = 0;
 
@@ -162,6 +171,14 @@ export class PelicanScene {
   private beakSnapTimer = 0;
   private bellRingTimer = 0;
   private bellRingCount = 0;
+
+  // Aerial Stunt Jump & State
+  private isJumpingAir = false;
+  private airJumpTimer = 0;
+  private isPaused = false;
+  private graphicQuality: GraphicQuality = 'high';
+  private lightningTimer = 0;
+  private lightningFlashTimer = 0;
 
   // Combo & Drafting Mechanics
   private comboCount = 0;
@@ -554,6 +571,16 @@ export class PelicanScene {
       this.roadSigns.push(sign);
       this.scene.add(sign);
     }
+
+    // Wooden Boardwalk Jump Ramps
+    const rampZPositions = [-60, -150, -240];
+    for (let i = 0; i < rampZPositions.length; i++) {
+      const ramp = createJumpRampMesh();
+      const laneX = i % 2 === 0 ? -2.2 : 2.2;
+      ramp.position.set(laneX, 0, rampZPositions[i]);
+      this.jumpRamps.push(ramp);
+      this.scene.add(ramp);
+    }
   }
 
   private spawnPlayer(): void {
@@ -656,11 +683,53 @@ export class PelicanScene {
     return next;
   }
 
+  public togglePause(): boolean {
+    this.isPaused = !this.isPaused;
+    if (this.isPaused) {
+      coastalAudio.stopSiren();
+      coastalAudio.stopWaveRoar();
+      coastalAudio.stopCalmSurf();
+    } else {
+      if (this.disasterPhase === 'active') {
+        coastalAudio.startSiren();
+        coastalAudio.startWaveRoar();
+      } else {
+        coastalAudio.startCalmSurf();
+      }
+    }
+    this.emitHud();
+    return this.isPaused;
+  }
+
+  public setGraphicQuality(quality: GraphicQuality): void {
+    this.graphicQuality = quality;
+    if (quality === 'battery_saver') {
+      this.renderer.setPixelRatio(1.0);
+      this.renderer.shadowMap.enabled = false;
+      this.sunLight.castShadow = false;
+    } else {
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      this.renderer.shadowMap.enabled = true;
+      this.sunLight.castShadow = true;
+    }
+    this.emitHud();
+  }
+
+  public updatePelicanIdentity(patch: Partial<PelicanIdentity>): void {
+    Object.assign(this.identity, patch);
+    this.spawnPlayer();
+    this.applyTierFrameTint();
+    this.emitHud();
+  }
+
   public restart(rerollPelican = false): void {
     if (rerollPelican) {
       this.identity = createRandomPelicanIdentity();
       this.spawnPlayer();
     }
+    this.isPaused = false;
+    this.isJumpingAir = false;
+    this.airJumpTimer = 0;
     this.playerX = 1.6;
     this.playerZ = 0;
     this.playerRig.group.rotation.set(0, 0, 0);
@@ -685,6 +754,12 @@ export class PelicanScene {
     this.roadSegments.forEach((seg, i) => {
       seg.position.z = -i * SEGMENT_LENGTH;
     });
+
+    const rampZPositions = [-60, -150, -240];
+    this.jumpRamps.forEach((ramp, idx) => {
+      ramp.position.set(idx % 2 === 0 ? -2.2 : 2.2, 0, rampZPositions[idx] || -60);
+    });
+
     this.spawnCompanions();
     this.resetDisasterCycle(true);
     this.applyTierFrameTint();
@@ -936,7 +1011,9 @@ export class PelicanScene {
     this.lastTime = now;
 
     if (!this.isGameOver) {
-      this.stepSimulation(dt, now * 0.001);
+      if (!this.isPaused) {
+        this.stepSimulation(dt, now * 0.001);
+      }
     } else {
       this.stepParticles(dt);
       // Gentle tumble & slow ocean drift during wipeout
@@ -1052,9 +1129,66 @@ export class PelicanScene {
       }
     }
 
+    // Jump ramps recycling & ramp jump trigger
+    for (const ramp of this.jumpRamps) {
+      if (ramp.position.z > this.playerZ + 25) {
+        ramp.position.z -= 3 * 90;
+        ramp.position.x = (Math.random() > 0.5 ? 1 : -1) * (1.6 + Math.random() * 1.4);
+      }
+    }
+
+    if (!this.isJumpingAir) {
+      for (const ramp of this.jumpRamps) {
+        const dx = this.playerX - ramp.position.x;
+        const dz = this.playerZ - ramp.position.z;
+        if (Math.abs(dx) < 1.35 && Math.abs(dz) < 1.9) {
+          this.isJumpingAir = true;
+          this.airJumpTimer = 0.92;
+          this.speed = Math.max(this.speed + 4.2, 16.8);
+          this.bannerText = '🦅 特技飞跃！凌空翱翔';
+          this.bannerTimer = 1.8;
+          coastalAudio.playJump();
+          this.checkAchievement('stunt_rider');
+          try {
+            navigator.vibrate?.([35, 25, 45]);
+          } catch {}
+          break;
+        }
+      }
+    }
+
+    let jumpY = 0;
+    if (this.isJumpingAir) {
+      this.airJumpTimer -= dt;
+      const progress = 1 - Math.max(0, this.airJumpTimer) / 0.92;
+      jumpY = Math.sin(progress * Math.PI) * 2.4;
+      // Pelican wings spread wide in mid-air trick!
+      this.playerRig.leftWing.rotation.z = 0.45 + Math.sin(progress * Math.PI * 4) * 0.15;
+      this.playerRig.rightWing.rotation.z = -0.45 - Math.sin(progress * Math.PI * 4) * 0.15;
+      this.playerRig.bodyGroup.rotation.x = -0.22 + progress * 0.44;
+
+      if (this.airJumpTimer <= 0) {
+        this.isJumpingAir = false;
+        jumpY = 0;
+        coastalAudio.playLanding();
+        // Landing dust particles
+        const landMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75 });
+        for (let k = 0; k < 8; k++) {
+          const lp = new THREE.Mesh(new THREE.SphereGeometry(0.12, 4, 4), landMat);
+          lp.position.set(this.playerX + (Math.random() - 0.5) * 0.8, 0.05, this.playerZ + (Math.random() - 0.5) * 0.8);
+          this.scene.add(lp);
+          this.particles.push({
+            mesh: lp,
+            vel: new THREE.Vector3((Math.random() - 0.5) * 3.5, 1.2 + Math.random() * 1.5, (Math.random() - 0.5) * 3.5),
+            life: 0.35,
+          });
+        }
+      }
+    }
+
     // Animate Pelican + Bike
     this.animatePelicanRig(this.playerRig, this.speed, steerInput, elapsedSec, dt);
-    this.playerRig.group.position.set(this.playerX, 0, this.playerZ);
+    this.playerRig.group.position.set(this.playerX, jumpY, this.playerZ);
     this.playerRig.shieldAura.visible = this.shieldTimer > 0;
     if (this.shieldTimer > 0) {
       this.playerRig.shieldAura.rotation.y += dt * 1.8;
@@ -1276,6 +1410,21 @@ export class PelicanScene {
       targetHemiGround = new THREE.Color(0x0369a1);
       targetHemiSky = new THREE.Color(0x94a3b8);
       targetSunIntensity = 0.7;
+
+      // Storm lightning & thunder
+      this.lightningTimer -= dt;
+      if (this.lightningTimer <= 0) {
+        this.lightningTimer = 6.5 + Math.random() * 9.5;
+        this.lightningFlashTimer = 0.22;
+        coastalAudio.playThunder();
+      }
+    }
+
+    if (this.lightningFlashTimer > 0) {
+      this.lightningFlashTimer -= dt;
+      targetSkyColor = new THREE.Color(0xdbeafe);
+      targetSunColor = new THREE.Color(0xffffff);
+      targetSunIntensity = 3.6;
     }
 
     this.skyCurrentColor.lerp(targetSkyColor, Math.min(1, 1.8 * dt));
@@ -1298,6 +1447,22 @@ export class PelicanScene {
       const hMat = this.playerRig.headlightBeam.material as THREE.MeshBasicMaterial;
       hMat.opacity += (targetHeadlightOpacity - hMat.opacity) * Math.min(1, 3 * dt);
     }
+
+    // Bioluminescent foam and ocean glow during night ("Blue Tears" / 荧光海蓝眼泪)
+    const isNight = this.timeOfDay === 'night';
+    const oceanMat = this.oceanPlane.material as THREE.MeshStandardMaterial;
+    oceanMat.emissive.set(isNight ? 0x0284c7 : 0x000000);
+    oceanMat.emissiveIntensity = isNight ? 0.35 : 0;
+
+    const foamMat = this.foamStrip.material as THREE.MeshStandardMaterial;
+    foamMat.emissive.set(isNight ? 0x22d3ee : 0x000000);
+    foamMat.emissiveIntensity = isNight ? 0.75 : 0;
+
+    this.tsunamiRig.foamClips.forEach((clip) => {
+      const cMat = clip.material as THREE.MeshStandardMaterial;
+      cMat.emissive.set(isNight ? 0x22d3ee : 0x000000);
+      cMat.emissiveIntensity = isNight ? 0.85 : 0;
+    });
 
     // Jumping Dolphins in coastal sea
     for (let i = 0; i < this.dolphins.length; i++) {
@@ -1340,6 +1505,9 @@ export class PelicanScene {
     // Contact shadow blob beneath player's bicycle
     this.contactShadow.position.set(this.playerX, 0.012, this.playerZ);
     this.contactShadow.rotation.y = this.playerRig.handlebarGroup.rotation.y * 0.5;
+    this.contactShadow.scale.setScalar(
+      this.isJumpingAir ? Math.max(0.35, 1 - this.playerRig.group.position.y * 0.28) : 1,
+    );
 
     // Sailboats gently cruise with world
     this.sailboats.forEach((boat, idx) => {
@@ -1634,6 +1802,9 @@ export class PelicanScene {
       isDrafting: this.isDrafting,
       latestAchievement: this.achievementToastTimer > 0 ? this.latestAchievement : null,
       totalAchievementsUnlocked: this.unlockedAchievements.size,
+      isPaused: this.isPaused,
+      graphicQuality: this.graphicQuality,
+      isJumpingAir: this.isJumpingAir,
     });
   }
 

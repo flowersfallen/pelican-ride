@@ -2,6 +2,8 @@ import {
   Bell,
   Camera,
   Compass,
+  Palette,
+  Pause,
   RefreshCw,
   Shield,
   Volume2,
@@ -18,6 +20,8 @@ interface GameHudProps {
   onRerollPelican: () => void;
   onRingBell: () => void;
   onCycleCamera: () => void;
+  onTogglePause: () => void;
+  onOpenWardrobe: () => void;
 }
 
 export function GameHud({
@@ -27,6 +31,8 @@ export function GameHud({
   onRerollPelican,
   onRingBell,
   onCycleCamera,
+  onTogglePause,
+  onOpenWardrobe,
 }: GameHudProps) {
   const isWarning = hud.disasterPhase === 'warning';
   const isActive = hud.disasterPhase === 'active';
@@ -158,6 +164,27 @@ export function GameHud({
 
             <button
               type="button"
+              onClick={onOpenWardrobe}
+              aria-label="打开鹈鹕更衣室定制"
+              className="inline-flex items-center gap-1 rounded-xl border border-pink-400/35 bg-slate-950/60 hover:bg-slate-900/80 text-pink-200 px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold shadow-md backdrop-blur transition-colors"
+              title="个性化定制鹈鹕帽子、围巾与涂装"
+            >
+              <Palette className="w-3.5 h-3.5 text-pink-300" />
+              <span>换装</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onTogglePause}
+              aria-label="暂停游戏"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/30 bg-slate-950/60 hover:bg-slate-900/80 text-white shadow-md backdrop-blur transition-colors"
+              title="暂停游戏 [快捷键 ESC]"
+            >
+              <Pause className="w-4 h-4 text-slate-200" />
+            </button>
+
+            <button
+              type="button"
               onClick={onToggleMute}
               aria-label={hud.isMuted ? '开启声音' : '静音'}
               className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/30 bg-slate-950/60 hover:bg-slate-900/80 text-white shadow-md backdrop-blur transition-colors"
@@ -221,13 +248,20 @@ export function GameHud({
             </div>
           )}
 
-          {/* Active Buff / Combo / Drafting / Shallow Water Badges */}
+          {/* Active Buff / Combo / Drafting / Stunt Air / Shallow Water Badges */}
           {(hud.boostRemainingSec > 0 ||
             hud.shieldRemainingSec > 0 ||
             hud.inShallowWater ||
             hud.comboCount >= 2 ||
-            hud.isDrafting) && (
+            hud.isDrafting ||
+            hud.isJumpingAir) && (
             <div className="flex flex-wrap items-center justify-center gap-1.5">
+              {hud.isJumpingAir && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 px-2.5 py-0.5 text-[11px] font-extrabold shadow animate-bounce">
+                  <span>🦅</span>
+                  <span>特技飞跃中！</span>
+                </span>
+              )}
               {hud.comboCount >= 2 && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-orange-500 to-rose-500 text-white px-2.5 py-0.5 text-[11px] font-extrabold shadow animate-bounce">
                   <span>🔥</span>

@@ -1327,3 +1327,44 @@ export function createRoadSignMesh(
 
   return group;
 }
+
+export function createJumpRampMesh(): THREE.Group {
+  const group = new THREE.Group();
+  const woodMat = new THREE.MeshStandardMaterial({
+    color: 0xd97706, // Warm beach driftwood ramp
+    roughness: 0.85,
+    flatShading: true,
+  });
+  const yellowMat = new THREE.MeshStandardMaterial({
+    color: 0xfacc15, // Caution chevron
+    roughness: 0.5,
+    flatShading: true,
+  });
+
+  const rampW = 2.4;
+  const rampL = 3.6;
+  const rampH = 0.55;
+
+  const ramp = new THREE.Mesh(new THREE.BoxGeometry(rampW, 0.14, rampL), woodMat);
+  ramp.position.set(0, rampH * 0.48, 0);
+  ramp.rotation.x = 0.15;
+  ramp.castShadow = true;
+  ramp.receiveShadow = true;
+  group.add(ramp);
+
+  for (let i = 0; i < 2; i++) {
+    const chev = new THREE.Mesh(new THREE.BoxGeometry(rampW * 0.65, 0.04, 0.24), yellowMat);
+    chev.position.set(0, rampH * 0.48 + 0.08, (i - 0.5) * 1.3);
+    chev.rotation.x = 0.15;
+    group.add(chev);
+  }
+
+  const strutMat = new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.9 });
+  [-rampW / 2 + 0.12, rampW / 2 - 0.12].forEach((sx) => {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, rampH, 0.12), strutMat);
+    post.position.set(sx, rampH * 0.5, -rampL * 0.42);
+    group.add(post);
+  });
+
+  return group;
+}

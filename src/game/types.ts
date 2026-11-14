@@ -12,7 +12,10 @@ export type AchievementId =
   | 'tsunami_master'
   | 'combo_frenzy'
   | 'night_rider'
-  | 'bell_ringer';
+  | 'bell_ringer'
+  | 'stunt_rider';
+
+export type GraphicQuality = 'high' | 'battery_saver';
 
 export interface Achievement {
   id: AchievementId;
@@ -84,4 +87,7 @@ export interface GameHudState {
   isDrafting: boolean;
   latestAchievement: Achievement | null;
   totalAchievementsUnlocked: number;
+  isPaused: boolean;
+  graphicQuality: GraphicQuality;
+  isJumpingAir: boolean;
 }

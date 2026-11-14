@@ -1,0 +1,18 @@
+{
+  "name": "Pelican Ride — 海边慢骑与海啸大逃亡",
+  "short_name": "PelicanRide",
+  "description": "打开网页即分配一只专属小鹈鹕沿海慢骑，遭遇每日随机海啸预警时加速突围，拾取海鲜升级座驾！",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0284c7",
+  "theme_color": "#0284c7",
+  "orientation": "landscape-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
