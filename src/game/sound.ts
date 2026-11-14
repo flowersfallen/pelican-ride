@@ -349,6 +349,98 @@ class CoastalAudioEngine {
     osc.start(now);
     osc.stop(now + 0.7);
   }
+
+  public playPelicanHonk(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(280, now);
+      osc.frequency.linearRampToValueAtTime(360, now + 0.08);
+      osc.frequency.exponentialRampToValueAtTime(220, now + 0.22);
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(650, now);
+      filter.Q.setValueAtTime(3.5, now);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.09, now + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.26);
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playCombo(combo: number): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const pentatonic = [329.6, 392.0, 440.0, 523.25, 587.33, 659.25, 783.99, 880.0];
+      const note = pentatonic[Math.min(pentatonic.length - 1, Math.max(0, combo - 1))];
+
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(note, now);
+      osc.frequency.exponentialRampToValueAtTime(note * 1.05, now + 0.15);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.12, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.3);
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playAchievement(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const notes = [523.25, 659.25, 783.99];
+      notes.forEach((freq, idx) => {
+        if (!this.ctx) return;
+        const noteStart = now + idx * 0.09;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, noteStart);
+
+        gain.gain.setValueAtTime(0.001, noteStart);
+        gain.gain.linearRampToValueAtTime(0.11, noteStart + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, noteStart + 0.38);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(noteStart);
+        osc.stop(noteStart + 0.4);
+      });
+    } catch {
+      // Audio fallback
+    }
+  }
 }
 
 export const coastalAudio = new CoastalAudioEngine();

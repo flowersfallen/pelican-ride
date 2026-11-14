@@ -74,6 +74,15 @@ export function GameHud({
               <span className={hud.speedKmh < 0 ? 'text-amber-300' : 'text-sky-300'}>
                 {hud.speedKmh} km/h
               </span>
+              <span className="rounded bg-white/10 px-1.5 py-0.2 text-[10px] font-sans text-amber-200">
+                {hud.timeOfDay === 'sunset'
+                  ? '🌅 暮色落日'
+                  : hud.timeOfDay === 'night'
+                  ? '🌙 海岸星夜'
+                  : hud.timeOfDay === 'dawn'
+                  ? '🌄 晨曦破晓'
+                  : '☀️ 晴空碧海'}
+              </span>
             </div>
 
             {/* Upgrade Progress Bar */}
@@ -212,9 +221,28 @@ export function GameHud({
             </div>
           )}
 
-          {/* Active Buff / Shallow Water Badges */}
-          {(hud.boostRemainingSec > 0 || hud.shieldRemainingSec > 0 || hud.inShallowWater) && (
+          {/* Active Buff / Combo / Drafting / Shallow Water Badges */}
+          {(hud.boostRemainingSec > 0 ||
+            hud.shieldRemainingSec > 0 ||
+            hud.inShallowWater ||
+            hud.comboCount >= 2 ||
+            hud.isDrafting) && (
             <div className="flex flex-wrap items-center justify-center gap-1.5">
+              {hud.comboCount >= 2 && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-orange-500 to-rose-500 text-white px-2.5 py-0.5 text-[11px] font-extrabold shadow animate-bounce">
+                  <span>🔥</span>
+                  <span>连击 x{hud.comboCount}</span>
+                  <span className="text-[10px] text-amber-200 font-mono">
+                    ({hud.comboRemainingSec}s)
+                  </span>
+                </span>
+              )}
+              {hud.isDrafting && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-cyan-600/90 text-white px-2.5 py-0.5 text-[11px] font-bold shadow animate-pulse">
+                  <span>💨</span>
+                  <span>尾流破风中 +15% 极速</span>
+                </span>
+              )}
               {hud.boostRemainingSec > 0 && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/85 text-white px-2.5 py-0.5 text-[11px] font-bold shadow">
                   <Zap className="w-3 h-3" />
@@ -236,6 +264,26 @@ export function GameHud({
           )}
         </div>
       </header>
+
+      {/* Achievement Unlock Toast Notification */}
+      {hud.latestAchievement && (
+        <div className="pointer-events-none fixed top-4 sm:top-6 inset-x-0 z-50 flex justify-center px-4 animate-bounce">
+          <div className="rounded-2xl border border-amber-300/60 bg-slate-950/92 text-white px-4 py-2.5 shadow-2xl backdrop-blur-xl flex items-center gap-3 max-w-sm">
+            <span className="text-2xl shrink-0">{hud.latestAchievement.icon}</span>
+            <div className="min-w-0">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-amber-300">
+                🏆 成就解锁达成！
+              </div>
+              <div className="text-xs sm:text-sm font-extrabold text-white truncate">
+                {hud.latestAchievement.title}
+              </div>
+              <div className="text-[11px] text-slate-300 truncate">
+                {hud.latestAchievement.desc}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

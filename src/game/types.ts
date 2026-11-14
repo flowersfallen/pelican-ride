@@ -4,6 +4,23 @@ export type CollectibleType = 'fish' | 'shrimp' | 'starfish' | 'seaweed';
 
 export type DisasterPhase = 'calm' | 'warning' | 'active' | 'receding';
 
+export type TimeOfDay = 'noon' | 'sunset' | 'night' | 'dawn';
+
+export type AchievementId =
+  | 'first_mile'
+  | 'speed_demon'
+  | 'tsunami_master'
+  | 'combo_frenzy'
+  | 'night_rider'
+  | 'bell_ringer';
+
+export interface Achievement {
+  id: AchievementId;
+  title: string;
+  desc: string;
+  icon: string;
+}
+
 export interface PelicanIdentity {
   id: string;
   tag: string;
@@ -61,4 +78,10 @@ export interface GameHudState {
   bannerText: string | null;
   todayWaveSeedLabel: string;
   cameraMode: 'action' | 'chill' | 'drone';
+  timeOfDay: TimeOfDay;
+  comboCount: number;
+  comboRemainingSec: number;
+  isDrafting: boolean;
+  latestAchievement: Achievement | null;
+  totalAchievementsUnlocked: number;
 }

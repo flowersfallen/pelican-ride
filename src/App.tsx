@@ -29,6 +29,12 @@ const INITIAL_HUD: GameHudState = {
   bannerText: null,
   todayWaveSeedLabel: '今日潮汐扰动 · 随机突袭',
   cameraMode: 'action',
+  timeOfDay: 'noon',
+  comboCount: 0,
+  comboRemainingSec: 0,
+  isDrafting: false,
+  latestAchievement: null,
+  totalAchievementsUnlocked: 0,
 };
 
 export function App() {

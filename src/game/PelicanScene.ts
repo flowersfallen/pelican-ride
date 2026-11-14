@@ -6,12 +6,16 @@ import {
 import {
   createCloudMesh,
   createCollectibleMesh,
+  createDolphinMesh,
   createLighthouseMesh,
   createMountainRidge,
   createPalmTreeMesh,
   createPelicanRiderMesh,
+  createRoadSignMesh,
   createSeagullMesh,
+  createStarfield,
   createTsunamiWallMesh,
+  DolphinRig,
   LighthouseRig,
   PelicanRig,
   SeagullRig,
@@ -24,12 +28,15 @@ import {
 } from './pelicanProfile';
 import { coastalAudio } from './sound';
 import {
+  Achievement,
+  AchievementId,
   CollectibleType,
   DisasterPhase,
   GameHudState,
   InputState,
   PelicanIdentity,
   PickupCounts,
+  TimeOfDay,
 } from './types';
 
 interface CollectibleEntity {
@@ -59,6 +66,46 @@ const ROAD_HALF_WIDTH = 6.2;
 const SEGMENT_LENGTH = 18;
 const SEGMENT_COUNT = 16;
 const STORAGE_BEST_KEY = 'pelican_ride_best_meters_v1';
+const STORAGE_ACHIEVEMENTS_KEY = 'pelican_ride_achievements_v1';
+
+export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
+  first_mile: {
+    id: 'first_mile',
+    title: '初登海滨',
+    desc: '骑行突破 100 米，吹吹舒适海风！',
+    icon: '🚴',
+  },
+  speed_demon: {
+    id: 'speed_demon',
+    title: '破风猎手',
+    desc: '车速飙过 65 km/h，宛如离弦之箭！',
+    icon: '⚡',
+  },
+  tsunami_master: {
+    id: 'tsunami_master',
+    title: '踏浪骑士',
+    desc: '成功避开 3 次大海啸吞噬！',
+    icon: '🌊',
+  },
+  combo_frenzy: {
+    id: 'combo_frenzy',
+    title: '海洋老饕',
+    desc: '达成 5 连击海鲜盛宴！',
+    icon: '🦐',
+  },
+  night_rider: {
+    id: 'night_rider',
+    title: '星夜兼程',
+    desc: '伴着微风骑入海岸星夜模式！',
+    icon: '🌙',
+  },
+  bell_ringer: {
+    id: 'bell_ringer',
+    title: '欢脱领骑',
+    desc: '累计按响车铃叮当 10 次！',
+    icon: '🔔',
+  },
+};
 
 export class PelicanScene {
   private container: HTMLElement;
@@ -96,6 +143,9 @@ export class PelicanScene {
   private lighthouseRig!: LighthouseRig;
   private mountainRidge!: THREE.Group;
   private contactShadow!: THREE.Mesh;
+  private starfield!: THREE.Points;
+  private dolphins: DolphinRig[] = [];
+  private roadSigns: THREE.Group[] = [];
   private cameraMode: 'action' | 'chill' | 'drone' = 'action';
   private lastWhooshTime = 0;
 
@@ -111,6 +161,18 @@ export class PelicanScene {
   private shieldTimer = 0;
   private beakSnapTimer = 0;
   private bellRingTimer = 0;
+  private bellRingCount = 0;
+
+  // Combo & Drafting Mechanics
+  private comboCount = 0;
+  private comboTimer = 0;
+  private isDrafting = false;
+  private timeOfDay: TimeOfDay = 'noon';
+
+  // Achievements
+  private unlockedAchievements = new Set<AchievementId>();
+  private latestAchievement: Achievement | null = null;
+  private achievementToastTimer = 0;
 
   private disasterMeta = getDailyDisasterMeta();
   private disasterPhase: DisasterPhase = 'calm';
@@ -156,6 +218,14 @@ export class PelicanScene {
     try {
       const saved = Number(localStorage.getItem(STORAGE_BEST_KEY) || '0');
       if (Number.isFinite(saved) && saved > 0) this.bestDistance = saved;
+
+      const rawAchievements = localStorage.getItem(STORAGE_ACHIEVEMENTS_KEY);
+      if (rawAchievements) {
+        const arr = JSON.parse(rawAchievements);
+        if (Array.isArray(arr)) {
+          arr.forEach((id) => this.unlockedAchievements.add(id as AchievementId));
+        }
+      }
     } catch {
       // Ignore storage failures in private modes
     }
@@ -459,6 +529,31 @@ export class PelicanScene {
     this.contactShadow = new THREE.Mesh(shadowGeo, shadowMat);
     this.contactShadow.position.set(this.playerX, 0.012, this.playerZ);
     this.scene.add(this.contactShadow);
+
+    // Starfield celestial sky dome for evening/night cycling
+    this.starfield = createStarfield();
+    this.scene.add(this.starfield);
+
+    // Graceful Jumping Dolphins in deep coastal water
+    for (let i = 0; i < 2; i++) {
+      const dolphin = createDolphinMesh();
+      dolphin.group.position.set(-46 - i * 16, -2, -65 - i * 55);
+      this.dolphins.push(dolphin);
+      this.scene.add(dolphin.group);
+    }
+
+    // Coastal Highway 101, Tsunami Evacuation Route & Scenic Bike Signs
+    const signTypes: ('highway' | 'tsunami_evac' | 'scenic_route')[] = [
+      'highway',
+      'scenic_route',
+      'tsunami_evac',
+    ];
+    for (let i = 0; i < 4; i++) {
+      const sign = createRoadSignMesh(signTypes[i % signTypes.length]);
+      sign.position.set(ROAD_HALF_WIDTH + 1.25, 0, -38 - i * 65);
+      this.roadSigns.push(sign);
+      this.scene.add(sign);
+    }
   }
 
   private spawnPlayer(): void {
@@ -515,10 +610,36 @@ export class PelicanScene {
 
   public triggerBell(): void {
     coastalAudio.playBell();
+    coastalAudio.playPelicanHonk();
     this.bellRingTimer = 0.65;
     this.bellRingMesh.visible = true;
     this.bellRingMesh.scale.setScalar(1);
     this.beakSnapTimer = 0.25;
+    this.bellRingCount += 1;
+    if (this.bellRingCount >= 10) {
+      this.checkAchievement('bell_ringer');
+    }
+  }
+
+  private checkAchievement(id: AchievementId): void {
+    if (this.unlockedAchievements.has(id)) return;
+    this.unlockedAchievements.add(id);
+    try {
+      localStorage.setItem(
+        STORAGE_ACHIEVEMENTS_KEY,
+        JSON.stringify(Array.from(this.unlockedAchievements)),
+      );
+    } catch {
+      // Ignore
+    }
+    const def = ACHIEVEMENTS_DEF[id];
+    if (def) {
+      this.latestAchievement = def;
+      this.achievementToastTimer = 4.2;
+      this.bannerText = `🏆 成就解锁：【${def.title}】${def.desc}`;
+      this.bannerTimer = 3.6;
+      coastalAudio.playAchievement();
+    }
   }
 
   public triggerManualTsunami(): void {
@@ -747,6 +868,22 @@ export class PelicanScene {
     this.beakSnapTimer = 0.35;
     coastalAudio.playPickup(item.type);
 
+    // Combo Chain System
+    if (this.comboTimer > 0) {
+      this.comboCount += 1;
+    } else {
+      this.comboCount = 1;
+    }
+    this.comboTimer = 2.8;
+    coastalAudio.playCombo(this.comboCount);
+
+    if (this.comboCount >= 2) {
+      this.speed += 1.8;
+      if (this.comboCount >= 5) {
+        this.checkAchievement('combo_frenzy');
+      }
+    }
+
     const colorMap: Record<CollectibleType, number> = {
       fish: 0x38bdf8,
       shrimp: 0xf97316,
@@ -759,16 +896,16 @@ export class PelicanScene {
     if (item.type === 'fish') {
       this.boostTimer = Math.max(this.boostTimer, 3.2);
       this.speed = Math.max(this.speed, getTierForLevel(this.level).maxForwardSpeed + 4.5);
-      this.bannerText = '🐟 叼到小鱼！速度飙升';
+      this.bannerText = this.comboCount >= 2 ? `🐟 连击 x${this.comboCount}！小鱼极速冲刺` : '🐟 叼到小鱼！速度飙升';
       this.bannerTimer = 1.6;
     } else if (item.type === 'shrimp') {
       this.boostTimer = Math.max(this.boostTimer, 2.5);
       this.speed = Math.max(this.speed, getTierForLevel(this.level).maxForwardSpeed + 8.0);
-      this.bannerText = '🦐 鲜虾极速冲刺！';
+      this.bannerText = this.comboCount >= 2 ? `🦐 连击 x${this.comboCount}！鲜虾狂飙` : '🦐 鲜虾极速冲刺！';
       this.bannerTimer = 1.6;
     } else if (item.type === 'starfish') {
       xpGain = 2;
-      this.bannerText = '⭐ 收集海星！升级经验 +2';
+      this.bannerText = this.comboCount >= 2 ? `⭐ 连击 x${this.comboCount}！海星升级双倍` : '⭐ 收集海星！升级经验 +2';
       this.bannerTimer = 1.6;
     } else {
       this.shieldTimer = Math.max(this.shieldTimer, 6.0);
@@ -830,17 +967,39 @@ export class PelicanScene {
       this.bannerTimer = Math.max(0, this.bannerTimer - dt);
       if (this.bannerTimer === 0) this.bannerText = null;
     }
+    if (this.comboTimer > 0) {
+      this.comboTimer = Math.max(0, this.comboTimer - dt);
+      if (this.comboTimer === 0) this.comboCount = 0;
+    }
+    if (this.achievementToastTimer > 0) {
+      this.achievementToastTimer = Math.max(0, this.achievementToastTimer - dt);
+      if (this.achievementToastTimer === 0) this.latestAchievement = null;
+    }
+
+    // Drafting / Slipstream behind companions
+    let draftingFound = false;
+    for (const comp of this.companions) {
+      const latDist = Math.abs(this.playerX - comp.laneX);
+      const lonDist = this.playerZ - comp.z; // positive when player is behind companion
+      if (latDist < 0.95 && lonDist > 1.2 && lonDist < 6.2) {
+        draftingFound = true;
+        break;
+      }
+    }
+    this.isDrafting = draftingFound;
+    const draftingBonus = this.isDrafting ? 1.15 : 1.0;
+    const comboBonus = this.comboCount >= 2 ? Math.min(4.8, (this.comboCount - 1) * 1.2) : 0;
 
     // Determine target forward/reverse velocity
-    const boostBonus = this.boostTimer > 0 ? 7.5 : this.shieldTimer > 0 ? 2.5 : 0;
+    const boostBonus = (this.boostTimer > 0 ? 7.5 : this.shieldTimer > 0 ? 2.5 : 0) + comboBonus;
     const inShallowWater = this.disasterPhase === 'active' && this.playerX < -1.9;
     const waterDrag = inShallowWater && this.shieldTimer <= 0 ? 0.78 : 1;
 
-    let targetSpeed = tier.cruiseSpeed + boostBonus; // Auto-cruise even with zero user input
+    let targetSpeed = (tier.cruiseSpeed + boostBonus) * draftingBonus; // Auto-cruise with bonuses
     if (this.input.brake) {
       targetSpeed = -4.8; // Brake and reverse pedal
     } else if (this.input.accelerate || this.boostTimer > 0) {
-      targetSpeed = (tier.maxForwardSpeed + boostBonus) * waterDrag;
+      targetSpeed = (tier.maxForwardSpeed + boostBonus) * waterDrag * draftingBonus;
     } else {
       targetSpeed = targetSpeed * waterDrag;
     }
@@ -866,6 +1025,30 @@ export class PelicanScene {
         localStorage.setItem(STORAGE_BEST_KEY, String(this.bestDistance));
       } catch {
         // Ignore storage limits
+      }
+    }
+
+    // Achievements milestone checking
+    if (distanceMeters >= 100) this.checkAchievement('first_mile');
+    if (this.speed * 3.2 >= 65) this.checkAchievement('speed_demon');
+    if (this.tsunamisSurvived >= 3) this.checkAchievement('tsunami_master');
+
+    // Time-of-Day Cycling (Noon -> Sunset -> Night -> Dawn)
+    const cycleMeters = distanceMeters % 3200;
+    let nextTimeOfDay: TimeOfDay = 'noon';
+    if (cycleMeters < 800) {
+      nextTimeOfDay = 'noon';
+    } else if (cycleMeters < 1800) {
+      nextTimeOfDay = 'sunset';
+    } else if (cycleMeters < 2800) {
+      nextTimeOfDay = 'night';
+    } else {
+      nextTimeOfDay = 'dawn';
+    }
+    if (nextTimeOfDay !== this.timeOfDay) {
+      this.timeOfDay = nextTimeOfDay;
+      if (this.timeOfDay === 'night') {
+        this.checkAchievement('night_rider');
       }
     }
 
@@ -1043,19 +1226,110 @@ export class PelicanScene {
     this.shallowFloodMesh.position.z = this.playerZ - 60;
     (this.shallowFloodMesh.material as THREE.MeshBasicMaterial).opacity = this.floodOpacity;
 
-    // Sky atmosphere shift during warning / active tsunami
+    // Sky atmosphere shift during warning / active tsunami & Time-of-Day cycle
     const isThreat = this.disasterPhase === 'warning' || this.disasterPhase === 'active';
-    const targetSky = isThreat ? this.skyAlertColor : this.skyCalmColor;
-    this.skyCurrentColor.lerp(targetSky, Math.min(1, 1.5 * dt));
+    let targetSkyColor: THREE.Color;
+    let targetHemiSky: THREE.Color;
+    let targetHemiGround: THREE.Color;
+    let targetSunColor: THREE.Color;
+    let targetSunIntensity: number;
+    let targetStarOpacity = 0;
+    let targetHeadlightOpacity = 0;
+
+    if (this.timeOfDay === 'sunset') {
+      targetSkyColor = new THREE.Color(0xf97316); // Amber Sunset
+      targetHemiSky = new THREE.Color(0xfde047);
+      targetHemiGround = new THREE.Color(0xc2410c);
+      targetSunColor = new THREE.Color(0xf59e0b);
+      targetSunIntensity = 1.15;
+      targetStarOpacity = 0.2;
+      targetHeadlightOpacity = 0.35;
+    } else if (this.timeOfDay === 'night') {
+      targetSkyColor = new THREE.Color(0x090d16); // Starry Deep Night
+      targetHemiSky = new THREE.Color(0x1e293b);
+      targetHemiGround = new THREE.Color(0x0284c7); // Cyan moonlight bioluminescence
+      targetSunColor = new THREE.Color(0x38bdf8); // Pale blue moon
+      targetSunIntensity = 0.55;
+      targetStarOpacity = 0.95;
+      targetHeadlightOpacity = 0.85;
+    } else if (this.timeOfDay === 'dawn') {
+      targetSkyColor = new THREE.Color(0xf472b6); // Rose Dawn
+      targetHemiSky = new THREE.Color(0xfce7f3);
+      targetHemiGround = new THREE.Color(0x0284c7);
+      targetSunColor = new THREE.Color(0xfde047);
+      targetSunIntensity = 1.05;
+      targetStarOpacity = 0.1;
+      targetHeadlightOpacity = 0.15;
+    } else {
+      // Noon (Cerulean sunny day)
+      targetSkyColor = this.skyCalmColor;
+      targetHemiSky = new THREE.Color(0xe0f2fe);
+      targetHemiGround = new THREE.Color(0xfde68a);
+      targetSunColor = new THREE.Color(0xfffbeb);
+      targetSunIntensity = 1.35;
+      targetStarOpacity = 0;
+      targetHeadlightOpacity = 0;
+    }
+
+    if (isThreat) {
+      targetSkyColor = this.skyAlertColor;
+      targetHemiGround = new THREE.Color(0x0369a1);
+      targetHemiSky = new THREE.Color(0x94a3b8);
+      targetSunIntensity = 0.7;
+    }
+
+    this.skyCurrentColor.lerp(targetSkyColor, Math.min(1, 1.8 * dt));
     (this.scene.background as THREE.Color).copy(this.skyCurrentColor);
     (this.scene.fog as THREE.FogExp2).color.copy(this.skyCurrentColor);
 
-    // Dynamic storm ambient lighting: in calm weather, warm golden sand ground reflection;
-    // in tsunami, deep oceanic azure reflection so water remains crystal pure sea blue!
-    const targetGround = isThreat ? new THREE.Color(0x0369a1) : new THREE.Color(0xfde68a);
-    const targetSkyLight = isThreat ? new THREE.Color(0x94a3b8) : new THREE.Color(0xe0f2fe);
-    this.hemiLight.groundColor.lerp(targetGround, Math.min(1, 2.5 * dt));
-    this.hemiLight.color.lerp(targetSkyLight, Math.min(1, 2.5 * dt));
+    this.hemiLight.color.lerp(targetHemiSky, Math.min(1, 2.5 * dt));
+    this.hemiLight.groundColor.lerp(targetHemiGround, Math.min(1, 2.5 * dt));
+    this.sunLight.color.lerp(targetSunColor, Math.min(1, 2.5 * dt));
+    this.sunLight.intensity += (targetSunIntensity - this.sunLight.intensity) * Math.min(1, 2.5 * dt);
+
+    // Update starfield opacity and position
+    (this.starfield.material as THREE.PointsMaterial).opacity +=
+      (targetStarOpacity - (this.starfield.material as THREE.PointsMaterial).opacity) * Math.min(1, 2 * dt);
+    this.starfield.position.z = this.playerZ;
+    this.starfield.rotation.y += dt * 0.005;
+
+    // Headlight cone opacity & taillight
+    if (this.playerRig.headlightBeam) {
+      const hMat = this.playerRig.headlightBeam.material as THREE.MeshBasicMaterial;
+      hMat.opacity += (targetHeadlightOpacity - hMat.opacity) * Math.min(1, 3 * dt);
+    }
+
+    // Jumping Dolphins in coastal sea
+    for (let i = 0; i < this.dolphins.length; i++) {
+      const dol = this.dolphins[i];
+      dol.jumpTimer += dt;
+      if (dol.jumpTimer >= dol.jumpCycleTime) {
+        dol.jumpTimer = 0;
+        dol.isJumping = true;
+        dol.baseZ = this.playerZ - 42 - Math.random() * 26;
+      }
+
+      if (dol.isJumping) {
+        const jumpDuration = 2.2;
+        const progress = dol.jumpTimer / jumpDuration;
+        if (progress <= 1.0) {
+          const arc = Math.sin(progress * Math.PI);
+          dol.group.position.set(dol.baseX, -1.8 + arc * 4.4, dol.baseZ - progress * 14);
+          dol.group.rotation.x = -0.55 + progress * 1.1;
+          dol.tailGroup.rotation.x = Math.sin(progress * Math.PI * 4) * 0.35;
+        } else {
+          dol.isJumping = false;
+          dol.group.position.y = -4;
+        }
+      }
+    }
+
+    // Coastal road signs recycling along Z
+    for (const sign of this.roadSigns) {
+      if (sign.position.z > this.playerZ + 35) {
+        sign.position.z -= 4 * 65;
+      }
+    }
 
     // Whoosh audio cue at high speed or during fish/shrimp boost
     if ((this.speed > 19 || this.boostTimer > 0) && elapsedSec - this.lastWhooshTime > 1.8) {
@@ -1354,6 +1628,12 @@ export class PelicanScene {
       bannerText: this.bannerText,
       todayWaveSeedLabel: this.disasterMeta.seedLabel,
       cameraMode: this.cameraMode,
+      timeOfDay: this.timeOfDay,
+      comboCount: this.comboCount,
+      comboRemainingSec: Number(Math.max(0, this.comboTimer).toFixed(1)),
+      isDrafting: this.isDrafting,
+      latestAchievement: this.achievementToastTimer > 0 ? this.latestAchievement : null,
+      totalAchievementsUnlocked: this.unlockedAchievements.size,
     });
   }
 

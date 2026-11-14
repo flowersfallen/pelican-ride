@@ -16,6 +16,9 @@ export interface PelicanRig {
   scarfTail: THREE.Mesh;
   shieldAura: THREE.Mesh;
   frameMeshes: THREE.Mesh[];
+  headlightMesh?: THREE.Mesh;
+  headlightBeam?: THREE.Mesh;
+  taillightMesh?: THREE.Mesh;
 }
 
 function makeTubeBetween(
@@ -230,6 +233,46 @@ export function createPelicanRiderMesh(
   cargoFish.position.set(0.04, 0.18, -0.2);
   handlebarGroup.add(cargoFish);
 
+  // Chrome bike headlamp mounted below basket
+  const headlampCasing = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.07, 0.055, 0.12, 8),
+    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.8, roughness: 0.2 }),
+  );
+  headlampCasing.rotation.x = Math.PI / 2;
+  headlampCasing.position.set(0, -0.08, -0.28);
+  handlebarGroup.add(headlampCasing);
+
+  const headlightMesh = new THREE.Mesh(
+    new THREE.CircleGeometry(0.065, 8),
+    new THREE.MeshBasicMaterial({ color: 0xfef08a }),
+  );
+  headlightMesh.position.set(0, -0.08, -0.34);
+  headlightMesh.rotation.y = Math.PI;
+  handlebarGroup.add(headlightMesh);
+
+  // Subtle forward headlamp conical beam for evening/night
+  const headlightBeam = new THREE.Mesh(
+    new THREE.ConeGeometry(1.6, 12, 10, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: 0xfef08a,
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  );
+  headlightBeam.rotation.x = -Math.PI / 2;
+  headlightBeam.position.set(0, -0.08, -6.34);
+  handlebarGroup.add(headlightBeam);
+
+  // Ruby taillight under rear seat
+  const taillightMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.08, 0.06, 0.05),
+    new THREE.MeshBasicMaterial({ color: 0xef4444 }),
+  );
+  taillightMesh.position.set(0, 1.06, 0.48);
+  bodyGroup.add(taillightMesh);
+
   // Crank + pedals
   const crankGroup = new THREE.Group();
   crankGroup.position.copy(crankPos);
@@ -385,6 +428,9 @@ export function createPelicanRiderMesh(
     scarfTail,
     shieldAura,
     frameMeshes,
+    headlightMesh,
+    headlightBeam,
+    taillightMesh,
   };
 }
 
@@ -1127,6 +1173,157 @@ export function createMountainRidge(): THREE.Group {
     peak.rotation.y = i * 0.8;
     group.add(peak);
   }
+
+  return group;
+}
+
+export interface DolphinRig {
+  group: THREE.Group;
+  tailGroup: THREE.Group;
+  jumpTimer: number;
+  isJumping: boolean;
+  jumpCycleTime: number;
+  baseX: number;
+  baseZ: number;
+}
+
+export function createDolphinMesh(): DolphinRig {
+  const group = new THREE.Group();
+  const dolphinMat = new THREE.MeshStandardMaterial({
+    color: 0x38bdf8,
+    roughness: 0.25,
+    metalness: 0.12,
+    flatShading: true,
+  });
+
+  // Torso
+  const body = new THREE.Mesh(new THREE.ConeGeometry(0.55, 2.2, 7), dolphinMat);
+  body.rotation.x = Math.PI / 2;
+  group.add(body);
+
+  // Snout / Beak
+  const snout = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.65, 5), dolphinMat);
+  snout.rotation.x = -Math.PI / 2;
+  snout.position.set(0, -0.05, -1.35);
+  group.add(snout);
+
+  // Dorsal fin
+  const dorsal = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 0.45), dolphinMat);
+  dorsal.position.set(0, 0.45, 0.1);
+  dorsal.rotation.x = -0.35;
+  group.add(dorsal);
+
+  // Flippers
+  [-1, 1].forEach((dir) => {
+    const flipper = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.06, 0.25), dolphinMat);
+    flipper.position.set(dir * 0.48, -0.15, -0.35);
+    flipper.rotation.z = -dir * 0.4;
+    flipper.rotation.y = dir * 0.25;
+    group.add(flipper);
+  });
+
+  // Articulated tail fluke
+  const tailGroup = new THREE.Group();
+  tailGroup.position.set(0, 0, 1.05);
+
+  const tailStem = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.35, 0.8, 6), dolphinMat);
+  tailStem.rotation.x = Math.PI / 2;
+  tailStem.position.set(0, 0, 0.4);
+  tailGroup.add(tailStem);
+
+  const fluke = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.06, 0.35), dolphinMat);
+  fluke.position.set(0, 0, 0.8);
+  tailGroup.add(fluke);
+
+  group.add(tailGroup);
+  group.scale.setScalar(1.2);
+  group.position.y = -2; // Initially underwater
+
+  return {
+    group,
+    tailGroup,
+    jumpTimer: Math.random() * 8,
+    isJumping: false,
+    jumpCycleTime: 8 + Math.random() * 6,
+    baseX: -36 - Math.random() * 32,
+    baseZ: -90,
+  };
+}
+
+export function createStarfield(): THREE.Points {
+  const starCount = 180;
+  const positions = new Float32Array(starCount * 3);
+  for (let i = 0; i < starCount; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.random() * (Math.PI * 0.42);
+    const radius = 175 + Math.random() * 25;
+    positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+    positions[i * 3 + 1] = radius * Math.cos(phi) + 12;
+    positions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({
+    color: 0xffffff,
+    size: 2.2,
+    transparent: true,
+    opacity: 0,
+    sizeAttenuation: true,
+  });
+  return new THREE.Points(geo, mat);
+}
+
+export function createRoadSignMesh(
+  type: 'highway' | 'tsunami_evac' | 'scenic_route',
+): THREE.Group {
+  const group = new THREE.Group();
+  const poleMat = new THREE.MeshStandardMaterial({
+    color: 0x64748b,
+    roughness: 0.6,
+    metalness: 0.5,
+  });
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.8, 6), poleMat);
+  post.position.y = 1.4;
+  post.castShadow = true;
+  group.add(post);
+
+  let boardColor = 0x0284c7; // Blue Pacific Route 101
+  let w = 1.35;
+  let h = 0.9;
+
+  if (type === 'tsunami_evac') {
+    boardColor = 0xe11d48; // Red/warning hazard sign
+    w = 1.25;
+    h = 1.25;
+  } else if (type === 'scenic_route') {
+    boardColor = 0x059669; // Green scenic bike highway sign
+    w = 1.45;
+    h = 0.8;
+  }
+
+  const boardMat = new THREE.MeshStandardMaterial({
+    color: boardColor,
+    roughness: 0.4,
+    metalness: 0.15,
+  });
+  const board = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.08), boardMat);
+  board.position.set(0, 2.3, 0);
+  board.castShadow = true;
+  group.add(board);
+
+  const border = new THREE.Mesh(
+    new THREE.BoxGeometry(w - 0.1, h - 0.1, 0.09),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 }),
+  );
+  border.position.set(0, 2.3, 0);
+  group.add(border);
+
+  const inner = new THREE.Mesh(
+    new THREE.BoxGeometry(w - 0.22, h - 0.22, 0.1),
+    boardMat,
+  );
+  inner.position.set(0, 2.3, 0);
+  group.add(inner);
 
   return group;
 }
