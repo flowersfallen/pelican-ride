@@ -25,6 +25,117 @@ class CoastalAudioEngine {
   private driftOsc: OscillatorNode | null = null;
   private driftGain: GainNode | null = null;
 
+  // Coastal Seaside Lo-Fi BGM Synthesizer
+  private bgmGain: GainNode | null = null;
+  private bgmVolume = 0.45;
+  private bgmTimer: number | null = null;
+  private bgmStep = 0;
+  private bgmMode: 'calm' | 'warning' | 'active' | 'photo' = 'calm';
+
+  public getBgmVolume(): number {
+    return this.bgmVolume;
+  }
+
+  public setBgmVolume(vol: number): void {
+    this.bgmVolume = Math.max(0, Math.min(1, vol));
+    if (this.bgmGain && this.ctx) {
+      this.bgmGain.gain.setValueAtTime(this.bgmVolume * 0.4, this.ctx.currentTime);
+    }
+  }
+
+  public setBgmMode(mode: 'calm' | 'warning' | 'active' | 'photo'): void {
+    this.bgmMode = mode;
+  }
+
+  public startBgm(): void {
+    if (this.bgmTimer !== null || this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    if (!this.bgmGain) {
+      this.bgmGain = this.ctx.createGain();
+      this.bgmGain.gain.setValueAtTime(this.bgmVolume * 0.4, this.ctx.currentTime);
+      this.bgmGain.connect(this.getDestination());
+    }
+
+    this.bgmTimer = window.setInterval(() => {
+      this.stepBgmBeat();
+    }, 240);
+  }
+
+  public stopBgm(): void {
+    if (this.bgmTimer !== null) {
+      clearInterval(this.bgmTimer);
+      this.bgmTimer = null;
+    }
+  }
+
+  private stepBgmBeat(): void {
+    if (!this.ctx || this.muted || this.bgmVolume <= 0) return;
+    const now = this.ctx.currentTime;
+    const dest = this.bgmGain || this.getDestination();
+
+    const chordIdx = Math.floor((this.bgmStep % 16) / 4);
+    const stepInChord = this.bgmStep % 4;
+
+    const calmChords = [
+      [261.63, 329.63, 392.0, 493.88], // C E G B
+      [220.0, 261.63, 329.63, 392.0],  // A C E G
+      [293.66, 349.23, 440.0, 523.25], // D F A C
+      [196.0, 246.94, 293.66, 349.23], // G B D F
+    ];
+    const bassNotes = [65.41, 55.0, 73.42, 49.0];
+
+    const stormChords = [
+      [261.63, 311.13, 392.0, 466.16], // Cm7
+      [233.08, 293.66, 349.23, 466.16], // Bb
+      [207.65, 261.63, 311.13, 415.3],  // Ab
+      [196.0, 246.94, 293.66, 392.0],   // G7
+    ];
+
+    const currentChord = (this.bgmMode === 'active' || this.bgmMode === 'warning')
+      ? stormChords[chordIdx]
+      : calmChords[chordIdx];
+
+    if (stepInChord === 0) {
+      const bassOsc = this.ctx.createOscillator();
+      const bassGain = this.ctx.createGain();
+      bassOsc.type = 'triangle';
+      bassOsc.frequency.setValueAtTime(bassNotes[chordIdx], now);
+      bassGain.gain.setValueAtTime(0.16, now);
+      bassGain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+      bassOsc.connect(bassGain);
+      bassGain.connect(dest);
+      bassOsc.start(now);
+      bassOsc.stop(now + 0.7);
+    }
+
+    const noteFreq = currentChord[stepInChord];
+    const noteOsc = this.ctx.createOscillator();
+    const noteGain = this.ctx.createGain();
+    const noteFilter = this.ctx.createBiquadFilter();
+
+    noteOsc.type = this.bgmMode === 'photo' ? 'sine' : 'triangle';
+    noteOsc.frequency.setValueAtTime(noteFreq, now);
+
+    noteFilter.type = 'lowpass';
+    noteFilter.frequency.setValueAtTime(this.bgmMode === 'active' ? 2400 : 1350, now);
+
+    const noteVol = (this.bgmMode === 'photo' ? 0.08 : 0.12) * (stepInChord === 0 ? 1.2 : 0.85);
+    noteGain.gain.setValueAtTime(0.001, now);
+    noteGain.gain.linearRampToValueAtTime(noteVol, now + 0.015);
+    noteGain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+
+    noteOsc.connect(noteFilter);
+    noteFilter.connect(noteGain);
+    noteGain.connect(dest);
+
+    noteOsc.start(now);
+    noteOsc.stop(now + 0.42);
+
+    this.bgmStep = (this.bgmStep + 1) % 64;
+  }
+
   public isMuted(): boolean {
     return this.muted;
   }
@@ -43,6 +154,7 @@ class CoastalAudioEngine {
   public setMuted(muted: boolean): void {
     this.muted = muted;
     if (muted) {
+      this.stopBgm();
       this.stopSiren();
       this.stopWaveRoar();
       this.stopCalmSurf();
@@ -50,6 +162,8 @@ class CoastalAudioEngine {
       if (this.windGain && this.ctx) {
         this.windGain.gain.setValueAtTime(0, this.ctx.currentTime);
       }
+    } else {
+      this.startBgm();
     }
   }
 
@@ -70,6 +184,7 @@ class CoastalAudioEngine {
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.setValueAtTime(this.masterVolume, this.ctx.currentTime);
       this.masterGain.connect(this.ctx.destination);
+      this.startBgm();
     }
   }
 

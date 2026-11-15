@@ -4,6 +4,7 @@ import {
   nextRandomCalmDuration,
 } from './disasterScheduler';
 import {
+  CloudRig,
   CrabRig,
   createCloudMesh,
   createCollectibleMesh,
@@ -17,6 +18,7 @@ import {
   createRainSystem,
   createRoadSignMesh,
   createSeagullMesh,
+  createSeaTurtleMesh,
   createStarfield,
   createTrafficConeMesh,
   createTsunamiWallMesh,
@@ -27,6 +29,7 @@ import {
   SeagullRig,
   TrafficConeRig,
   TsunamiRig,
+  TurtleRig,
   WindTurbineRig,
 } from './meshes';
 import {
@@ -182,6 +185,18 @@ export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
     desc: '在沿海路段见证海豚欢快跃出水面翻腾飞旋！',
     icon: '🐬',
   },
+  coastal_turtle: {
+    id: 'coastal_turtle',
+    title: '海龟漫步',
+    desc: '在沿海金色沙滩偶遇慢悠悠爬向大海的海龟伙伴！',
+    icon: '🐢',
+  },
+  coastal_melody: {
+    id: 'coastal_melody',
+    title: '海音律动',
+    desc: '在海浪与海风的伴奏下，聆听专属海滨 Lo-Fi 纯音乐旋律！',
+    icon: '🎵',
+  },
 };
 
 export class PelicanScene {
@@ -215,7 +230,8 @@ export class PelicanScene {
   private collectibles: CollectibleEntity[] = [];
   private particles: PopParticle[] = [];
   private bellRingMesh!: THREE.Mesh;
-  private clouds: THREE.Group[] = [];
+  private clouds: CloudRig[] = [];
+  private seaTurtles: TurtleRig[] = [];
   private seagulls: SeagullRig[] = [];
   private lighthouseRig!: LighthouseRig;
   private mountainRidge!: THREE.Group;
@@ -637,15 +653,25 @@ export class PelicanScene {
     this.scene.add(this.bellRingMesh);
 
     // Dynamic 3D Low-Poly Clouds in the sky
-    for (let i = 0; i < 11; i++) {
+    for (let i = 0; i < 12; i++) {
       const cloud = createCloudMesh();
-      cloud.position.set(
-        -45 + Math.random() * 90,
-        28 + Math.random() * 16,
-        -180 + i * 25 + (Math.random() - 0.5) * 12,
-      );
+      cloud.baseX = -45 + Math.random() * 90;
+      cloud.baseY = 24 + Math.random() * 12;
+      cloud.baseZ = -220 + i * 28 + (Math.random() - 0.5) * 14;
+      cloud.group.position.set(cloud.baseX, cloud.baseY, cloud.baseZ);
       this.clouds.push(cloud);
-      this.scene.add(cloud);
+      this.scene.add(cloud.group);
+    }
+
+    // Coastal Sea Turtles on Sandy Beach Verge (-X)
+    for (let i = 0; i < 5; i++) {
+      const turtle = createSeaTurtleMesh();
+      turtle.baseX = -3.2 - Math.random() * 1.4;
+      turtle.baseZ = -45 - i * 55;
+      turtle.group.position.set(turtle.baseX, 0, turtle.baseZ);
+      turtle.group.rotation.y = -Math.PI * 0.45 + (Math.random() - 0.5) * 0.3;
+      this.seaTurtles.push(turtle);
+      this.scene.add(turtle.group);
     }
 
     // Distant Rolling Mountain Ridge on the ocean horizon (-X)
@@ -902,6 +928,16 @@ export class PelicanScene {
         break;
       }
     }
+
+    // Friendly turtle nod when bell sounds nearby
+    for (const turtle of this.seaTurtles) {
+      const dz = Math.abs(turtle.group.position.z - this.playerZ);
+      if (dz < 22) {
+        turtle.isStartled = true;
+        turtle.startleTimer = 3.2;
+        this.checkAchievement('coastal_turtle');
+      }
+    }
   }
 
   private checkAchievement(id: AchievementId): void {
@@ -942,10 +978,12 @@ export class PelicanScene {
   public togglePause(): boolean {
     this.isPaused = !this.isPaused;
     if (this.isPaused) {
+      coastalAudio.stopBgm();
       coastalAudio.stopSiren();
       coastalAudio.stopWaveRoar();
       coastalAudio.stopCalmSurf();
     } else {
+      coastalAudio.startBgm();
       if (this.disasterPhase === 'active') {
         coastalAudio.startSiren();
         coastalAudio.startWaveRoar();
@@ -964,6 +1002,7 @@ export class PelicanScene {
 
   public togglePhotoMode(): boolean {
     this.isPhotoMode = !this.isPhotoMode;
+    coastalAudio.setBgmMode(this.isPhotoMode ? 'photo' : 'calm');
     if (this.isPhotoMode) {
       this.checkAchievement('coastal_photographer');
       this.bannerText = '📸 已开启沿海摄影模式 · 旋转视角拍摄海湾大片';
@@ -1112,6 +1151,7 @@ export class PelicanScene {
     this.bannerTimer = 4.5;
     coastalAudio.stopCalmSurf();
     coastalAudio.startSiren();
+    coastalAudio.setBgmMode('warning');
     this.spawnWaveCollectiblesBatch(5);
   }
 
@@ -1126,6 +1166,7 @@ export class PelicanScene {
     coastalAudio.stopCalmSurf();
     coastalAudio.stopSiren();
     coastalAudio.startWaveRoar();
+    coastalAudio.setBgmMode('active');
   }
 
   private enterRecedingPhase(): void {
@@ -1137,6 +1178,8 @@ export class PelicanScene {
     this.bannerText = '☀️ 海啸退潮了！海岸恢复平静，继续惬意慢骑吧';
     this.bannerTimer = 3.4;
     coastalAudio.stopSiren();
+    coastalAudio.setBgmMode('calm');
+    this.checkAchievement('coastal_melody');
     coastalAudio.stopWaveRoar();
     coastalAudio.startCalmSurf();
   }
@@ -1467,6 +1510,10 @@ export class PelicanScene {
     // Lighthouse lamp rotates
     if (this.lighthouseRig) {
       this.lighthouseRig.beamGroup.rotation.y += dt * 1.1;
+    }
+    // Clouds drift slowly in photo mode
+    for (const cloud of this.clouds) {
+      cloud.group.position.z += cloud.speed * dt * 0.4;
     }
     // Ocean gentle breathing
     this.oceanPlane.position.y = -0.5 + Math.sin(elapsedSec * 1.5) * 0.12;
@@ -2317,11 +2364,57 @@ export class PelicanScene {
 
     // Clouds drifting with wind and recycling along Z
     const cloudDrift = isThreat ? 11.5 : 3.8;
+    const cloudColorTarget = isThreat
+      ? 0x334155
+      : this.timeOfDay === 'sunset'
+      ? 0xfde047
+      : this.timeOfDay === 'night'
+      ? 0x1e293b
+      : this.timeOfDay === 'dawn'
+      ? 0xfbcfe8
+      : 0xffffff;
+
     for (const cloud of this.clouds) {
-      cloud.position.z += cloudDrift * dt;
-      if (cloud.position.z > this.playerZ + 60) {
-        cloud.position.z = this.playerZ - 200 - Math.random() * 50;
-        cloud.position.x = -45 + Math.random() * 90;
+      cloud.group.position.z += (cloudDrift + cloud.speed) * dt;
+      cloud.group.position.x = cloud.baseX + Math.sin(elapsedSec * 0.4 + cloud.wobbleOffset) * 2.5;
+      cloud.mat.color.setHex(cloudColorTarget);
+
+      if (cloud.group.position.z > this.playerZ + 60) {
+        cloud.group.position.z = this.playerZ - 240 - Math.random() * 60;
+        cloud.baseX = -45 + Math.random() * 90;
+      }
+    }
+
+    // Coastal Sea Turtles on Sandy Beach Verge (-X)
+    for (const turtle of this.seaTurtles) {
+      const paddleFreq = turtle.isStartled ? 9.5 : 3.2;
+      const flipperAngle = Math.sin(elapsedSec * paddleFreq) * 0.32;
+      turtle.frontLeftFlipper.rotation.y = flipperAngle;
+      turtle.frontRightFlipper.rotation.y = -flipperAngle;
+      turtle.backLeftFlipper.rotation.y = -flipperAngle * 0.6;
+      turtle.backRightFlipper.rotation.y = flipperAngle * 0.6;
+      turtle.head.position.y = 0.18 + Math.sin(elapsedSec * paddleFreq * 0.5) * 0.03;
+
+      turtle.group.position.x = Math.max(-5.5, turtle.group.position.x - turtle.crawlSpeed * dt);
+
+      if (turtle.startleTimer > 0) {
+        turtle.startleTimer = Math.max(0, turtle.startleTimer - dt);
+        if (turtle.startleTimer === 0) turtle.isStartled = false;
+      }
+
+      const distToTurtle = Math.hypot(
+        this.playerX - turtle.group.position.x,
+        this.playerZ - turtle.group.position.z,
+      );
+      if (distToTurtle < 7.5) {
+        turtle.isStartled = true;
+        turtle.startleTimer = 2.0;
+        this.checkAchievement('coastal_turtle');
+      }
+
+      if (turtle.group.position.z > this.playerZ + 45) {
+        turtle.group.position.z = this.playerZ - 260 - Math.random() * 40;
+        turtle.group.position.x = -3.2 - Math.random() * 1.4;
       }
     }
 
@@ -2651,6 +2744,7 @@ export class PelicanScene {
       gradientPct: Number(this.gradientPct.toFixed(1)),
       isFeverMode: this.isFeverMode,
       isPhotoMode: this.isPhotoMode,
+      bgmVolume: coastalAudio.getBgmVolume(),
     });
   }
 
@@ -2661,6 +2755,15 @@ export class PelicanScene {
 
   public getMasterVolume(): number {
     return coastalAudio.getMasterVolume();
+  }
+
+  public setBgmVolume(vol: number): void {
+    coastalAudio.setBgmVolume(vol);
+    this.emitHud();
+  }
+
+  public getBgmVolume(): number {
+    return coastalAudio.getBgmVolume();
   }
 
   private handleResize(): void {
@@ -2674,6 +2777,7 @@ export class PelicanScene {
   public dispose(): void {
     if (this.rafId !== null) window.cancelAnimationFrame(this.rafId);
     this.resizeObserver.disconnect();
+    coastalAudio.stopBgm();
     coastalAudio.stopSiren();
     coastalAudio.stopWaveRoar();
     coastalAudio.stopCalmSurf();

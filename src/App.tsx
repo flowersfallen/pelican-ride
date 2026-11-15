@@ -53,6 +53,7 @@ const INITIAL_HUD: GameHudState = {
   gradientPct: 0,
   isFeverMode: false,
   isPhotoMode: false,
+  bgmVolume: 0.45,
   lifetimeStats: {
     totalDistanceMeters: 0,
     totalTsunamisSurvived: 0,
@@ -215,6 +216,10 @@ export function App() {
     engineRef.current?.setMasterVolume(vol);
   }, []);
 
+  const handleSetBgmVolume = useCallback((vol: number) => {
+    engineRef.current?.setBgmVolume(vol);
+  }, []);
+
   const handleRerollPelican = useCallback(() => {
     coastalAudio.unlock();
     engineRef.current?.restart(true);
@@ -291,6 +296,7 @@ export function App() {
           onOpenWardrobe={handleOpenWardrobe}
           onTogglePhotoMode={handleTogglePhotoMode}
           onSetMasterVolume={handleSetMasterVolume}
+          onSetBgmVolume={handleSetBgmVolume}
         />
       )}
 

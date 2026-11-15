@@ -25,6 +25,8 @@ const ALL_ACHIEVEMENT_IDS: AchievementId[] = [
   'coastal_photographer',
   'slipstream_master',
   'dolphin_companion',
+  'coastal_turtle',
+  'coastal_melody',
 ];
 
 export function TrophyRoomModal({ hud, onClose }: TrophyRoomModalProps) {
