@@ -164,6 +164,24 @@ export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
     desc: '冲上跳台腾空飞跃时施展 360° 凌空特技回旋！',
     icon: '💫',
   },
+  coastal_photographer: {
+    id: 'coastal_photographer',
+    title: '海岸摄影师',
+    desc: '开启沿海摄影模式，定格属于你的海湾明信片！',
+    icon: '📸',
+  },
+  slipstream_master: {
+    id: 'slipstream_master',
+    title: '跟骑大师',
+    desc: '紧跟前车破风骑行进入气流真空带，享受 15% 提速！',
+    icon: '🚴',
+  },
+  dolphin_companion: {
+    id: 'dolphin_companion',
+    title: '海豚共舞',
+    desc: '在沿海路段见证海豚欢快跃出水面翻腾飞旋！',
+    icon: '🐬',
+  },
 };
 
 export class PelicanScene {
@@ -258,10 +276,15 @@ export class PelicanScene {
   private headlightTimer = 0;
   private isRaining = false;
 
-  // Combo & Drafting Mechanics
+  // Combo, Fever & Drafting Slipstream Mechanics
   private comboCount = 0;
   private comboTimer = 0;
   private isDrafting = false;
+  private draftingTimer = 0;
+  private lastDraftingSoundTime = 0;
+  private isFeverMode = false;
+  private isPhotoMode = false;
+  private photoCameraPreset: 'hero' | 'wide' | 'follow' | 'low' = 'hero';
   private timeOfDay: TimeOfDay = 'noon';
 
   // Career Lifetime Stats
@@ -866,6 +889,19 @@ export class PelicanScene {
         this.checkAchievement('crab_whisperer');
       }
     }
+
+    // Call nearby dolphins to leap and chirp happily!
+    for (const dol of this.dolphins) {
+      const dz = Math.abs(dol.group.position.z - this.playerZ);
+      if (dz < 65 && !dol.isJumping) {
+        dol.jumpTimer = 0;
+        dol.isJumping = true;
+        dol.baseZ = this.playerZ - 12 - Math.random() * 18;
+        coastalAudio.playDolphinChirp();
+        this.checkAchievement('dolphin_companion');
+        break;
+      }
+    }
   }
 
   private checkAchievement(id: AchievementId): void {
@@ -919,6 +955,32 @@ export class PelicanScene {
     }
     this.emitHud();
     return this.isPaused;
+  }
+
+  public setPaused(paused: boolean): void {
+    if (this.isPaused === paused) return;
+    this.togglePause();
+  }
+
+  public togglePhotoMode(): boolean {
+    this.isPhotoMode = !this.isPhotoMode;
+    if (this.isPhotoMode) {
+      this.checkAchievement('coastal_photographer');
+      this.bannerText = '📸 已开启沿海摄影模式 · 旋转视角拍摄海湾大片';
+      this.bannerTimer = 2.4;
+      coastalAudio.playCameraShutter();
+    }
+    this.emitHud();
+    return this.isPhotoMode;
+  }
+
+  public setPhotoCameraPreset(preset: 'hero' | 'wide' | 'follow' | 'low'): void {
+    this.photoCameraPreset = preset;
+    this.emitHud();
+  }
+
+  public getRendererCanvas(): HTMLCanvasElement {
+    return this.renderer.domElement;
   }
 
   public setGraphicQuality(quality: GraphicQuality): void {
@@ -1221,6 +1283,30 @@ export class PelicanScene {
     }
   }
 
+  private spawnSplashParticles(x: number, y: number, z: number): void {
+    if (this.particles.length >= 80) return;
+    const geo = new THREE.SphereGeometry(0.14, 4, 4);
+    const splashMat = new THREE.MeshBasicMaterial({
+      color: 0xe0f2fe,
+      transparent: true,
+      opacity: 0.8,
+    });
+    for (let i = 0; i < 5; i++) {
+      const m = new THREE.Mesh(geo, splashMat);
+      m.position.set(x + (Math.random() - 0.5) * 1.5, y + 0.2, z + (Math.random() - 0.5) * 1.5);
+      this.scene.add(m);
+      this.particles.push({
+        mesh: m,
+        vel: new THREE.Vector3(
+          (Math.random() - 0.5) * 4,
+          2.2 + Math.random() * 2.8,
+          (Math.random() - 0.5) * 4,
+        ),
+        life: 0.5,
+      });
+    }
+  }
+
   private handlePickup(item: CollectibleEntity): void {
     this.pickups[item.type] += 1;
     this.lifetimeStats.totalPickups += 1;
@@ -1239,6 +1325,12 @@ export class PelicanScene {
     if (this.comboCount >= 2) {
       this.speed += 1.8;
       if (this.comboCount >= 5) {
+        if (!this.isFeverMode) {
+          this.isFeverMode = true;
+          coastalAudio.playComboFever();
+          this.bannerText = '🔥 FEVER TIME！全速金光冲刺！';
+          this.bannerTimer = 2.4;
+        }
         this.checkAchievement('combo_frenzy');
       }
     }
@@ -1304,7 +1396,9 @@ export class PelicanScene {
     this.lastTime = now;
 
     if (!this.isGameOver) {
-      if (!this.isPaused) {
+      if (this.isPhotoMode) {
+        this.stepPhotoMode(dt, now * 0.001);
+      } else if (!this.isPaused) {
         this.stepSimulation(dt, now * 0.001);
       }
     } else {
@@ -1327,6 +1421,57 @@ export class PelicanScene {
     }
   };
 
+  private stepPhotoMode(dt: number, elapsedSec: number): void {
+    const pX = this.playerX;
+    const pY = this.playerRig.group.position.y;
+    const pZ = this.playerZ;
+
+    // Gentle camera orbit / breathing motion for cinematic photography
+    const orbitSin = Math.sin(elapsedSec * 0.7) * 0.25;
+    const orbitCos = Math.cos(elapsedSec * 0.7) * 0.25;
+
+    const targetCamPos = new THREE.Vector3();
+    const targetLookAt = new THREE.Vector3();
+
+    switch (this.photoCameraPreset) {
+      case 'hero':
+        // Front-quarter 45° glamorous portrait
+        targetCamPos.set(pX + 1.8 + orbitSin, pY + 1.15, pZ - 2.6 + orbitCos);
+        targetLookAt.set(pX, pY + 0.85, pZ);
+        break;
+      case 'wide':
+        // High scenic panoramic coastline view
+        targetCamPos.set(pX + 8.5 + orbitSin * 1.5, pY + 4.8, pZ + 3.5 + orbitCos * 1.5);
+        targetLookAt.set(pX - 4.0, pY + 1.0, pZ - 8.0);
+        break;
+      case 'follow':
+        // Action chasing close behind rear wheel
+        targetCamPos.set(pX + 0.25 + orbitSin * 0.5, pY + 0.85, pZ + 3.2);
+        targetLookAt.set(pX, pY + 0.9, pZ - 8.0);
+        break;
+      case 'low':
+        // Ultra-low asphalt ground level view
+        targetCamPos.set(pX - 1.5 + orbitSin * 0.4, pY + 0.38, pZ - 1.4);
+        targetLookAt.set(pX + 0.1, pY + 0.65, pZ + 0.3);
+        break;
+    }
+
+    this.camera.position.lerp(targetCamPos, Math.min(1, dt * 4.5));
+    this.camera.lookAt(targetLookAt);
+
+    // Keep ambient wind turbines rotating gently
+    for (const turbine of this.windTurbines) {
+      turbine.rotorGroup.rotation.z += turbine.rotorSpeed * dt * 0.6;
+      turbine.beaconMesh.visible = Math.sin(elapsedSec * 4) > 0.25;
+    }
+    // Lighthouse lamp rotates
+    if (this.lighthouseRig) {
+      this.lighthouseRig.beamGroup.rotation.y += dt * 1.1;
+    }
+    // Ocean gentle breathing
+    this.oceanPlane.position.y = -0.5 + Math.sin(elapsedSec * 1.5) * 0.12;
+  }
+
   private stepSimulation(dt: number, elapsedSec: number): void {
     const tier = getTierForLevel(this.level);
 
@@ -1340,7 +1485,10 @@ export class PelicanScene {
     }
     if (this.comboTimer > 0) {
       this.comboTimer = Math.max(0, this.comboTimer - dt);
-      if (this.comboTimer === 0) this.comboCount = 0;
+      if (this.comboTimer === 0) {
+        this.comboCount = 0;
+        this.isFeverMode = false;
+      }
     }
     if (this.achievementToastTimer > 0) {
       this.achievementToastTimer = Math.max(0, this.achievementToastTimer - dt);
@@ -1349,17 +1497,74 @@ export class PelicanScene {
 
     // Drafting / Slipstream behind companions
     let draftingFound = false;
+    let draftingCompanion: (typeof this.companions)[0] | null = null;
     for (const comp of this.companions) {
       const latDist = Math.abs(this.playerX - comp.laneX);
       const lonDist = this.playerZ - comp.z; // positive when player is behind companion
-      if (latDist < 0.95 && lonDist > 1.2 && lonDist < 6.2) {
+      if (latDist < 0.95 && lonDist > 1.0 && lonDist < 6.5) {
         draftingFound = true;
+        draftingCompanion = comp;
         break;
       }
     }
     this.isDrafting = draftingFound;
+    if (this.isDrafting) {
+      this.draftingTimer += dt;
+      if (this.draftingTimer >= 2.0) {
+        this.checkAchievement('slipstream_master');
+      }
+      if (elapsedSec - this.lastDraftingSoundTime > 1.2) {
+        this.lastDraftingSoundTime = elapsedSec;
+        coastalAudio.playDraftingWhoosh();
+      }
+      // Aerodynamic cyan slipstream ribbon particle
+      if (Math.random() < 0.45 && draftingCompanion) {
+        const ribbonMat = new THREE.MeshBasicMaterial({
+          color: 0x38bdf8,
+          transparent: true,
+          opacity: 0.7,
+        });
+        const ribbon = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.8), ribbonMat);
+        ribbon.position.set(
+          draftingCompanion.laneX + (Math.random() - 0.5) * 0.4,
+          0.45 + (Math.random() - 0.5) * 0.25,
+          (this.playerZ + draftingCompanion.z) * 0.5 + (Math.random() - 0.5) * 0.8,
+        );
+        this.scene.add(ribbon);
+        this.particles.push({
+          mesh: ribbon,
+          vel: new THREE.Vector3(0, 0, 12),
+          life: 0.25,
+        });
+      }
+    } else {
+      this.draftingTimer = Math.max(0, this.draftingTimer - dt * 0.5);
+    }
     const draftingBonus = this.isDrafting ? 1.15 : 1.0;
-    const comboBonus = this.comboCount >= 2 ? Math.min(4.8, (this.comboCount - 1) * 1.2) : 0;
+    const feverBonus = this.isFeverMode ? 3.0 : 0;
+    const comboBonus = (this.comboCount >= 2 ? Math.min(4.8, (this.comboCount - 1) * 1.2) : 0) + feverBonus;
+
+    // Trailing rainbow/gold sparkles in fever mode
+    if (this.isFeverMode && Math.random() < 0.35) {
+      const feverColors = [0xf59e0b, 0xec4899, 0x8b5cf6, 0x06b6d4, 0x10b981];
+      const feverMat = new THREE.MeshBasicMaterial({
+        color: feverColors[Math.floor(Math.random() * feverColors.length)],
+        transparent: true,
+        opacity: 0.9,
+      });
+      const feverStar = new THREE.Mesh(new THREE.OctahedronGeometry(0.1, 0), feverMat);
+      feverStar.position.set(
+        this.playerX + (Math.random() - 0.5) * 0.6,
+        this.playerRig.group.position.y + 0.4 + (Math.random() - 0.5) * 0.4,
+        this.playerZ + 0.8 + Math.random() * 0.4,
+      );
+      this.scene.add(feverStar);
+      this.particles.push({
+        mesh: feverStar,
+        vel: new THREE.Vector3((Math.random() - 0.5) * 1.5, 1.2 + Math.random() * 1.5, 3.5),
+        life: 0.4,
+      });
+    }
 
     // Determine target forward/reverse velocity
     const boostBonus =
@@ -2053,9 +2258,21 @@ export class PelicanScene {
           dol.group.position.set(dol.baseX, -1.8 + arc * 4.4, dol.baseZ - progress * 14);
           dol.group.rotation.x = -0.55 + progress * 1.1;
           dol.tailGroup.rotation.x = Math.sin(progress * Math.PI * 4) * 0.35;
+
+          // In mid-jump near player, chirp and trigger achievement
+          if (progress > 0.4 && progress < 0.6) {
+            const dz = Math.abs(dol.group.position.z - this.playerZ);
+            if (dz < 60) {
+              this.checkAchievement('dolphin_companion');
+              if (Math.random() < 0.25) {
+                coastalAudio.playDolphinChirp();
+              }
+            }
+          }
         } else {
           dol.isJumping = false;
           dol.group.position.y = -4;
+          this.spawnSplashParticles(dol.baseX, 0, dol.baseZ - 14);
         }
       }
     }
@@ -2432,6 +2649,8 @@ export class PelicanScene {
       heartRateBpm: Math.round(this.heartRateBpm),
       caloriesKcal: Math.round(this.caloriesKcal * 10) / 10,
       gradientPct: Number(this.gradientPct.toFixed(1)),
+      isFeverMode: this.isFeverMode,
+      isPhotoMode: this.isPhotoMode,
     });
   }
 

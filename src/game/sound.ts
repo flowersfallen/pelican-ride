@@ -844,6 +844,132 @@ class CoastalAudioEngine {
       // Audio fallback
     }
   }
+
+  public playComboFever(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      // Upbeat celebratory major chord burst
+      const chord = [523.25, 659.25, 783.99, 987.77, 1046.5];
+      chord.forEach((freq, idx) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.04);
+        gain.gain.setValueAtTime(0.001, now + idx * 0.04);
+        gain.gain.linearRampToValueAtTime(0.09, now + idx * 0.04 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.04 + 0.35);
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(now + idx * 0.04);
+        osc.stop(now + idx * 0.04 + 0.38);
+      });
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playDolphinChirp(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      // Playful FM chirp
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(2200, now);
+      osc.frequency.exponentialRampToValueAtTime(3600, now + 0.08);
+      osc.frequency.exponentialRampToValueAtTime(1800, now + 0.18);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(0.08, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+      osc.connect(gain);
+      gain.connect(this.getDestination());
+      osc.start(now);
+      osc.stop(now + 0.24);
+
+      // Splash white noise
+      const bufferSize = Math.floor(this.ctx.sampleRate * 0.25);
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
+      }
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1400, now);
+      const noiseGain = this.ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.05, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      noise.connect(filter);
+      filter.connect(noiseGain);
+      noiseGain.connect(this.getDestination());
+      noise.start(now + 0.05);
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playCameraShutter(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      // Dual-click shutter mechanism: mirror flip + blade shutter
+      [0, 0.06].forEach((delay) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(1800, now + delay);
+        osc.frequency.exponentialRampToValueAtTime(320, now + delay + 0.03);
+        gain.gain.setValueAtTime(0.07, now + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.04);
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(now + delay);
+        osc.stop(now + delay + 0.05);
+      });
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playDraftingWhoosh(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(160, now);
+      osc.frequency.linearRampToValueAtTime(240, now + 0.15);
+      osc.frequency.linearRampToValueAtTime(180, now + 0.35);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(0.05, now + 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
+      osc.connect(gain);
+      gain.connect(this.getDestination());
+      osc.start(now);
+      osc.stop(now + 0.42);
+    } catch {
+      // Audio fallback
+    }
+  }
 }
 
 export const coastalAudio = new CoastalAudioEngine();

@@ -23,6 +23,7 @@ interface PauseMenuModalProps {
   onSetGraphicQuality: (quality: GraphicQuality) => void;
   onOpenTrophyRoom: () => void;
   onOpenWardrobe?: () => void;
+  onTogglePhotoMode?: () => void;
   onSetMasterVolume: (vol: number) => void;
 }
 
@@ -35,6 +36,7 @@ export function PauseMenuModal({
   onSetGraphicQuality,
   onOpenTrophyRoom,
   onOpenWardrobe,
+  onTogglePhotoMode,
   onSetMasterVolume,
 }: PauseMenuModalProps) {
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
@@ -103,7 +105,7 @@ export function PauseMenuModal({
           >
             <div className="text-[10px] text-amber-300 font-medium">已解锁成就 ❯</div>
             <div className="text-sm sm:text-base font-bold text-amber-300 font-mono mt-0.5">
-              {hud.totalAchievementsUnlocked} / 11
+              {hud.totalAchievementsUnlocked} / 17
             </div>
           </button>
         </div>
@@ -234,22 +236,31 @@ export function PauseMenuModal({
             <span>继续骑行 [ESC]</span>
           </button>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={onTogglePhotoMode}
+              className="py-2.5 px-2 rounded-2xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 font-semibold text-xs border border-amber-400/30 flex flex-col items-center justify-center gap-1 transition-colors"
+            >
+              <Camera className="w-4 h-4 text-amber-300" />
+              <span>沿海摄影</span>
+            </button>
+
             <button
               type="button"
               onClick={onOpenWardrobe}
-              className="py-2.5 px-3 rounded-2xl bg-pink-500/15 hover:bg-pink-500/25 text-pink-200 font-semibold text-xs border border-pink-400/30 flex items-center justify-center gap-1.5 transition-colors"
+              className="py-2.5 px-2 rounded-2xl bg-pink-500/15 hover:bg-pink-500/25 text-pink-200 font-semibold text-xs border border-pink-400/30 flex flex-col items-center justify-center gap-1 transition-colors"
             >
-              <Palette className="w-3.5 h-3.5 text-pink-400" />
+              <Palette className="w-4 h-4 text-pink-300" />
               <span>涂装更衣室</span>
             </button>
 
             <button
               type="button"
               onClick={onOpenTrophyRoom}
-              className="py-2.5 px-3 rounded-2xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 font-semibold text-xs border border-amber-400/30 flex items-center justify-center gap-1.5 transition-colors"
+              className="py-2.5 px-2 rounded-2xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-200 font-semibold text-xs border border-sky-400/30 flex flex-col items-center justify-center gap-1 transition-colors"
             >
-              <Trophy className="w-3.5 h-3.5 text-amber-400" />
+              <Trophy className="w-4 h-4 text-sky-300" />
               <span>荣誉陈列馆</span>
             </button>
           </div>

@@ -3,6 +3,7 @@ import { GameHud } from './components/GameHud';
 import { GameOverModal } from './components/GameOverModal';
 import { MobileControls } from './components/MobileControls';
 import { PauseMenuModal } from './components/PauseMenuModal';
+import { PhotoModeModal, PhotoPreset } from './components/PhotoModeModal';
 import { TrophyRoomModal } from './components/TrophyRoomModal';
 import { WardrobeModal } from './components/WardrobeModal';
 import { PelicanScene } from './game/PelicanScene';
@@ -50,6 +51,8 @@ const INITIAL_HUD: GameHudState = {
   heartRateBpm: 115,
   caloriesKcal: 0,
   gradientPct: 0,
+  isFeverMode: false,
+  isPhotoMode: false,
   lifetimeStats: {
     totalDistanceMeters: 0,
     totalTsunamisSurvived: 0,
@@ -106,13 +109,19 @@ export function App() {
         return;
       }
       if (e.code === 'Escape' && !e.repeat) {
-        if (isTrophyRoomOpen) {
+        if (hud.isPhotoMode) {
+          engineRef.current?.togglePhotoMode();
+        } else if (isTrophyRoomOpen) {
           setIsTrophyRoomOpen(false);
         } else if (isWardrobeOpen) {
           setIsWardrobeOpen(false);
         } else {
           engineRef.current?.togglePause();
         }
+        return;
+      }
+      if (e.code === 'KeyP' && !e.repeat && !hud.isGameOver) {
+        engineRef.current?.togglePhotoMode();
         return;
       }
       if ((e.code === 'KeyC' || e.code === 'KeyV') && !e.repeat) {
@@ -176,18 +185,22 @@ export function App() {
 
   const handleOpenWardrobe = useCallback(() => {
     setIsWardrobeOpen(true);
+    engineRef.current?.setPaused(true);
   }, []);
 
   const handleCloseWardrobe = useCallback(() => {
     setIsWardrobeOpen(false);
+    engineRef.current?.setPaused(false);
   }, []);
 
   const handleOpenTrophyRoom = useCallback(() => {
     setIsTrophyRoomOpen(true);
+    engineRef.current?.setPaused(true);
   }, []);
 
   const handleCloseTrophyRoom = useCallback(() => {
     setIsTrophyRoomOpen(false);
+    engineRef.current?.setPaused(false);
   }, []);
 
   const handleUpdateIdentity = useCallback((patch: Partial<PelicanIdentity>) => {
@@ -211,6 +224,18 @@ export function App() {
     engineRef.current?.restart(false);
   }, []);
 
+  const handleTogglePhotoMode = useCallback(() => {
+    engineRef.current?.togglePhotoMode();
+  }, []);
+
+  const handleSelectPhotoPreset = useCallback((preset: PhotoPreset) => {
+    engineRef.current?.setPhotoCameraPreset(preset);
+  }, []);
+
+  const handleGetRendererCanvas = useCallback(() => {
+    return engineRef.current?.getRendererCanvas() ?? null;
+  }, []);
+
   const isDisaster = hud.disasterPhase === 'warning' || hud.disasterPhase === 'active';
 
   return (
@@ -219,27 +244,42 @@ export function App() {
       <div ref={mountRef} className="w-full h-full" />
 
       {/* Minimal Glass HUD */}
-      <GameHud
-        hud={hud}
-        onTriggerTsunami={handleTriggerTsunami}
-        onToggleMute={handleToggleMute}
-        onRerollPelican={handleRerollPelican}
-        onRingBell={handleRingBell}
-        onCycleCamera={handleCycleCamera}
-        onTogglePause={handleTogglePause}
-        onOpenWardrobe={handleOpenWardrobe}
-        onOpenTrophyRoom={handleOpenTrophyRoom}
-      />
+      {!hud.isPhotoMode && (
+        <GameHud
+          hud={hud}
+          onTriggerTsunami={handleTriggerTsunami}
+          onToggleMute={handleToggleMute}
+          onRerollPelican={handleRerollPelican}
+          onRingBell={handleRingBell}
+          onCycleCamera={handleCycleCamera}
+          onTogglePause={handleTogglePause}
+          onOpenWardrobe={handleOpenWardrobe}
+          onOpenTrophyRoom={handleOpenTrophyRoom}
+          onTogglePhotoMode={handleTogglePhotoMode}
+        />
+      )}
 
       {/* PC Keyboard Guide & Mobile Touch Controls */}
-      <MobileControls
-        onInputChange={handleInputChange}
-        onRingBell={handleRingBell}
-        isDisaster={isDisaster}
-      />
+      {!hud.isPhotoMode && (
+        <MobileControls
+          onInputChange={handleInputChange}
+          onRingBell={handleRingBell}
+          isDisaster={isDisaster}
+        />
+      )}
+
+      {/* Coastal Photo Mode Modal */}
+      {hud.isPhotoMode && !hud.isGameOver && (
+        <PhotoModeModal
+          hud={hud}
+          getCanvas={handleGetRendererCanvas}
+          onSelectPreset={handleSelectPhotoPreset}
+          onClose={handleTogglePhotoMode}
+        />
+      )}
 
       {/* Pause Menu Modal */}
-      {hud.isPaused && !hud.isGameOver && !isWardrobeOpen && !isTrophyRoomOpen && (
+      {hud.isPaused && !hud.isGameOver && !isWardrobeOpen && !isTrophyRoomOpen && !hud.isPhotoMode && (
         <PauseMenuModal
           hud={hud}
           onResume={handleTogglePause}
@@ -249,6 +289,7 @@ export function App() {
           onSetGraphicQuality={handleSetGraphicQuality}
           onOpenTrophyRoom={handleOpenTrophyRoom}
           onOpenWardrobe={handleOpenWardrobe}
+          onTogglePhotoMode={handleTogglePhotoMode}
           onSetMasterVolume={handleSetMasterVolume}
         />
       )}
