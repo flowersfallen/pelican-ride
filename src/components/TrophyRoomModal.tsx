@@ -22,6 +22,9 @@ const ALL_ACHIEVEMENT_IDS: AchievementId[] = [
   'lighthouse_beacon',
   'custom_garage',
   'aerial_acrobat',
+  'coastal_photographer',
+  'slipstream_master',
+  'dolphin_companion',
 ];
 
 export function TrophyRoomModal({ hud, onClose }: TrophyRoomModalProps) {

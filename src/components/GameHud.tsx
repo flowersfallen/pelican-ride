@@ -24,6 +24,7 @@ interface GameHudProps {
   onTogglePause: () => void;
   onOpenWardrobe: () => void;
   onOpenTrophyRoom: () => void;
+  onTogglePhotoMode?: () => void;
 }
 
 export function GameHud({
@@ -36,6 +37,7 @@ export function GameHud({
   onTogglePause,
   onOpenWardrobe,
   onOpenTrophyRoom,
+  onTogglePhotoMode,
 }: GameHudProps) {
   const isWarning = hud.disasterPhase === 'warning';
   const isActive = hud.disasterPhase === 'active';
@@ -52,6 +54,17 @@ export function GameHud({
           className="pointer-events-none fixed inset-0 z-10 opacity-70 animate-pulse"
           style={{
             background: 'radial-gradient(circle at center, transparent 45%, rgba(56, 189, 248, 0.22) 80%, rgba(254, 240, 138, 0.35) 100%)',
+          }}
+        />
+      )}
+
+      {/* Fever Mode Rainbow Sparkle Vignette */}
+      {hud.isFeverMode && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-10 border-4 sm:border-8 border-amber-400/60 animate-pulse"
+          style={{
+            boxShadow: 'inset 0 0 55px rgba(245, 158, 11, 0.45)',
           }}
         />
       )}
@@ -212,6 +225,17 @@ export function GameHud({
 
             <button
               type="button"
+              onClick={onTogglePhotoMode}
+              aria-label="沿海摄影模式"
+              className="inline-flex items-center gap-1 rounded-xl border border-sky-400/35 bg-slate-950/60 hover:bg-slate-900/80 text-sky-200 px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold shadow-md backdrop-blur transition-colors"
+              title="开启沿海摄影模式，拍摄海湾大片 [快捷键 P]"
+            >
+              <Camera className="w-3.5 h-3.5 text-sky-300" />
+              <span>摄影</span>
+            </button>
+
+            <button
+              type="button"
               onClick={onOpenWardrobe}
               aria-label="打开鹈鹕更衣室定制"
               className="inline-flex items-center gap-1 rounded-xl border border-pink-400/35 bg-slate-950/60 hover:bg-slate-900/80 text-pink-200 px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold shadow-md backdrop-blur transition-colors"
@@ -313,9 +337,16 @@ export function GameHud({
             hud.headlightRemainingSec > 0 ||
             hud.inShallowWater ||
             hud.comboCount >= 2 ||
+            hud.isFeverMode ||
             hud.isDrafting ||
             hud.isJumpingAir) && (
             <div className="flex flex-wrap items-center justify-center gap-1.5">
+              {hud.isFeverMode && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-red-500 via-amber-500 to-yellow-400 text-slate-950 px-2.5 py-0.5 text-[11px] font-black shadow-lg shadow-amber-500/50 animate-bounce">
+                  <span>🔥</span>
+                  <span>FEVER 狂热冲刺 (+3.0)</span>
+                </span>
+              )}
               {hud.isJumpingAir && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 px-2.5 py-0.5 text-[11px] font-extrabold shadow animate-bounce">
                   <span>🦅</span>

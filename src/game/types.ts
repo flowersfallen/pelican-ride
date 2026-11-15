@@ -20,7 +20,10 @@ export type AchievementId =
   | 'drift_master'
   | 'lighthouse_beacon'
   | 'custom_garage'
-  | 'aerial_acrobat';
+  | 'aerial_acrobat'
+  | 'coastal_photographer'
+  | 'slipstream_master'
+  | 'dolphin_companion';
 
 export type GraphicQuality = 'high' | 'battery_saver';
 
@@ -117,4 +120,6 @@ export interface GameHudState {
   heartRateBpm: number;
   caloriesKcal: number;
   gradientPct: number;
+  isFeverMode: boolean;
+  isPhotoMode: boolean;
 }
