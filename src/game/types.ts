@@ -25,7 +25,8 @@ export type AchievementId =
   | 'slipstream_master'
   | 'dolphin_companion'
   | 'coastal_turtle'
-  | 'coastal_melody';
+  | 'coastal_melody'
+  | 'seagull_escort';
 
 export type GraphicQuality = 'high' | 'battery_saver';
 
@@ -125,4 +126,6 @@ export interface GameHudState {
   isFeverMode: boolean;
   isPhotoMode: boolean;
   bgmVolume: number;
+  gear: number;
+  tachometerPct: number;
 }

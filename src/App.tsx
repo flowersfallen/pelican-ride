@@ -54,6 +54,8 @@ const INITIAL_HUD: GameHudState = {
   isFeverMode: false,
   isPhotoMode: false,
   bgmVolume: 0.45,
+  gear: 1,
+  tachometerPct: 40,
   lifetimeStats: {
     totalDistanceMeters: 0,
     totalTsunamisSurvived: 0,

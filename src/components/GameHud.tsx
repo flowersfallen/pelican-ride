@@ -105,8 +105,11 @@ export function GameHud({
                   (最高 {hud.bestDistanceMeters}m)
                 </span>
               </span>
-              <span className={hud.speedKmh < 0 ? 'text-amber-300' : 'text-sky-300'}>
-                {hud.speedKmh} km/h
+              <span className={`inline-flex items-center gap-1 font-bold ${hud.speedKmh < 0 ? 'text-amber-300' : hud.speedKmh > 55 ? 'text-rose-400 animate-pulse' : 'text-sky-300'}`}>
+                <span>{hud.speedKmh} km/h</span>
+                <span className="text-[10px] px-1 py-0.2 rounded bg-sky-400/20 text-sky-200 border border-sky-300/30 font-sans font-normal">
+                  {hud.gear === 0 ? '倒车' : hud.gear >= 5 ? '极速 S' : `${hud.gear}档`}
+                </span>
               </span>
               <span className="rounded bg-white/10 px-1.5 py-0.2 text-[10px] font-sans text-amber-200">
                 {hud.timeOfDay === 'sunset'
@@ -170,6 +173,26 @@ export function GameHud({
                 <span className={hud.gradientPct >= 0 ? 'text-emerald-300' : 'text-sky-300'}>
                   {hud.gradientPct > 0 ? `+${hud.gradientPct}` : hud.gradientPct}%
                 </span>
+              </span>
+            </div>
+
+            {/* Speedometer Tachometer Gauge Bar */}
+            <div className="mt-1.5 flex items-center gap-1.5">
+              <span className="text-[9px] font-mono text-slate-400">TACHO</span>
+              <div className="h-1.5 flex-1 rounded-full bg-white/10 overflow-hidden relative">
+                <div
+                  className="h-full rounded-full transition-all duration-150"
+                  style={{
+                    width: `${hud.tachometerPct}%`,
+                    background:
+                      hud.tachometerPct > 75
+                        ? 'linear-gradient(90deg, #38bdf8 0%, #fbbf24 60%, #f43f5e 100%)'
+                        : 'linear-gradient(90deg, #38bdf8 0%, #34d399 100%)',
+                  }}
+                />
+              </div>
+              <span className="font-mono text-[9px] text-sky-300">
+                {hud.tachometerPct}%
               </span>
             </div>
           </div>
