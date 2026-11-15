@@ -203,6 +203,12 @@ export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
     desc: '极速破风飞驰时，唤来海鸥群在车身两侧贴地伴飞！',
     icon: '🕊️',
   },
+  blue_tears: {
+    id: 'blue_tears',
+    title: '蓝眼泪之夜',
+    desc: '在夜幕降临海滨时，领略海浪与车轮泛起的平潭蓝眼泪荧光微芒！',
+    icon: '🌊',
+  },
 };
 
 export class PelicanScene {
@@ -1262,10 +1268,11 @@ export class PelicanScene {
     if (this.disasterPhase !== 'active') return;
     if (this.particles.length >= 75) return;
     const geo = new THREE.SphereGeometry(0.12, 4, 4);
+    const isNight = this.timeOfDay === 'night';
     const sprayMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
+      color: isNight ? 0x22d3ee : 0xffffff,
       transparent: true,
-      opacity: 0.85,
+      opacity: isNight ? 0.95 : 0.85,
     });
     // Spray from towering ocean wave crest (left X = -12..-8, high Y = 8.5..10.5)
     for (let i = 0; i < 2; i++) {
@@ -1336,11 +1343,12 @@ export class PelicanScene {
 
   private spawnSplashParticles(x: number, y: number, z: number): void {
     if (this.particles.length >= 80) return;
+    const isNight = this.timeOfDay === 'night';
     const geo = new THREE.SphereGeometry(0.14, 4, 4);
     const splashMat = new THREE.MeshBasicMaterial({
-      color: 0xe0f2fe,
+      color: isNight ? 0x22d3ee : 0xe0f2fe,
       transparent: true,
-      opacity: 0.8,
+      opacity: isNight ? 0.92 : 0.8,
     });
     for (let i = 0; i < 5; i++) {
       const m = new THREE.Mesh(geo, splashMat);
@@ -1363,6 +1371,9 @@ export class PelicanScene {
     this.lifetimeStats.totalPickups += 1;
     this.beakSnapTimer = 0.35;
     coastalAudio.playPickup(item.type);
+    try {
+      navigator.vibrate?.(25);
+    } catch {}
 
     // Combo Chain System
     if (this.comboTimer > 0) {
@@ -1742,6 +1753,35 @@ export class PelicanScene {
     // Hard brake skid marks when not drifting
     if (this.input.brake && this.speed > 5 && !this.isDrifting && Math.random() < 0.35) {
       this.spawnSkidMark(this.playerX, this.playerZ + 0.6, 0.5);
+    }
+
+    // Pingtan "Blue Tears" bioluminescent phosphorescent water droplets behind bike tires at night
+    if (this.timeOfDay === 'night' && this.speed > 5.5 && Math.random() < 0.45) {
+      if (!this.unlockedAchievements.has('blue_tears')) {
+        this.checkAchievement('blue_tears');
+        coastalAudio.playBlueTearsSparkle();
+      }
+      const btMat = new THREE.MeshBasicMaterial({
+        color: 0x22d3ee,
+        transparent: true,
+        opacity: 0.9,
+      });
+      const btDrop = new THREE.Mesh(new THREE.SphereGeometry(0.09, 4, 4), btMat);
+      btDrop.position.set(
+        this.playerX + (Math.random() - 0.5) * 0.28,
+        0.08 + Math.random() * 0.12,
+        this.playerZ + 0.65,
+      );
+      this.scene.add(btDrop);
+      this.particles.push({
+        mesh: btDrop,
+        vel: new THREE.Vector3(
+          (Math.random() - 0.5) * 1.8,
+          0.8 + Math.random() * 1.2,
+          5.0 + Math.random() * 3.5,
+        ),
+        life: 0.38,
+      });
     }
 
     // Freewheel ratchet ASMR click when coasting without pedaling

@@ -1,20 +1,25 @@
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Bell } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Bell, Sparkles } from 'lucide-react';
 import { InputState } from '../game/types';
 
 interface MobileControlsProps {
   onInputChange: (patch: Partial<InputState>) => void;
   onRingBell: () => void;
   isDisaster: boolean;
+  isJumpingAir?: boolean;
 }
 
 export function MobileControls({
   onInputChange,
   onRingBell,
   isDisaster,
+  isJumpingAir = false,
 }: MobileControlsProps) {
   const bindHold = (key: keyof InputState) => ({
     onPointerDown: (e: React.PointerEvent) => {
       e.preventDefault();
+      try {
+        navigator.vibrate?.(25);
+      } catch {}
       e.currentTarget.setPointerCapture(e.pointerId);
       onInputChange({ [key]: true });
     },
@@ -26,6 +31,13 @@ export function MobileControls({
     onLostPointerCapture: () => onInputChange({ [key]: false }),
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   });
+
+  const handleTouchBell = () => {
+    try {
+      navigator.vibrate?.(isJumpingAir ? [40, 30, 60] : 30);
+    } catch {}
+    onRingBell();
+  };
 
   return (
     <div className="pointer-events-none fixed bottom-0 inset-x-0 z-20 p-3 sm:p-5 pb-[max(0.9rem,env(safe-area-inset-bottom))]">
@@ -49,6 +61,9 @@ export function MobileControls({
           </span>
           <span>
             <kbd className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[11px]">C</kbd> 切换视角
+          </span>
+          <span>
+            <kbd className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[11px]">P</kbd> 沿海摄影
           </span>
           <span>
             <kbd className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[11px]">Space</kbd> 叮铃 / 360°凌空特技
@@ -82,11 +97,15 @@ export function MobileControls({
         <div className="pointer-events-auto flex items-end gap-2">
           <button
             type="button"
-            aria-label="响铃"
-            onClick={onRingBell}
-            className="touch-control-btn inline-flex h-11 w-11 items-center justify-center rounded-xl border border-amber-300/40 bg-slate-950/60 active:bg-amber-500 active:scale-95 text-amber-200 shadow-lg backdrop-blur-md"
+            aria-label={isJumpingAir ? '360°凌空特技' : '响铃'}
+            onClick={handleTouchBell}
+            className={`touch-control-btn inline-flex items-center justify-center rounded-xl shadow-lg backdrop-blur-md transition-all active:scale-95 ${
+              isJumpingAir
+                ? 'h-12 w-14 border border-amber-300 bg-gradient-to-r from-amber-400 to-yellow-400 text-slate-950 font-black animate-bounce shadow-amber-400/40'
+                : 'h-11 w-11 border border-amber-300/40 bg-slate-950/60 active:bg-amber-500 text-amber-200'
+            }`}
           >
-            <Bell className="w-5 h-5" />
+            {isJumpingAir ? <Sparkles className="w-5 h-5 fill-slate-950" /> : <Bell className="w-5 h-5" />}
           </button>
           <button
             type="button"
