@@ -29,6 +29,7 @@ const ALL_ACHIEVEMENT_IDS: AchievementId[] = [
   'coastal_melody',
   'seagull_escort',
   'blue_tears',
+  'coastal_milestone',
 ];
 
 export function TrophyRoomModal({ hud, onClose }: TrophyRoomModalProps) {

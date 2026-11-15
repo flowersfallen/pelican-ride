@@ -27,7 +27,8 @@ export type AchievementId =
   | 'coastal_turtle'
   | 'coastal_melody'
   | 'seagull_escort'
-  | 'blue_tears';
+  | 'blue_tears'
+  | 'coastal_milestone';
 
 export type GraphicQuality = 'high' | 'battery_saver';
 
