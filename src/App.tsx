@@ -272,6 +272,7 @@ export function App() {
           onInputChange={handleInputChange}
           onRingBell={handleRingBell}
           isDisaster={isDisaster}
+          isJumpingAir={hud.isJumpingAir}
         />
       )}
 
