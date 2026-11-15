@@ -26,7 +26,7 @@ export function GameOverModal({
         : hud.timeOfDay === 'dawn'
         ? '晨曦破晓'
         : '晴空碧海';
-    const text = `🚴‍♂️ 我在《骑行吧！鹈鹕》【${timeLabel}】时段飞驰了 ${hud.distanceMeters} 米！\n🌊 成功躲过 ${hud.tsunamisSurvived} 次滔天巨浪 · 解锁成就 ${hud.totalAchievementsUnlocked}/6 · 座驾升级至【${hud.tierName}】！\n🐟 海洋战利品：小鱼×${hud.pickups.fish} 鲜虾×${hud.pickups.shrimp} 海星×${hud.pickups.starfish} 海草×${hud.pickups.seaweed}\n👉 快来挑战我的海滨避浪战绩：https://ride.ridingpelican.com`;
+    const text = `🚴‍♂️ 我在《骑行吧！鹈鹕》【${timeLabel}】时段飞驰了 ${hud.distanceMeters} 米！\n🌊 成功躲过 ${hud.tsunamisSurvived} 次滔天巨浪 · 解锁成就 ${hud.totalAchievementsUnlocked}/7 · 座驾升级至【${hud.tierName}】！\n🐟 海洋战利品：小鱼×${hud.pickups.fish} 鲜虾×${hud.pickups.shrimp} 海星×${hud.pickups.starfish} 海草×${hud.pickups.seaweed} 车灯×${hud.pickups.lantern}\n👉 快来挑战我的海滨避浪战绩：https://ride.ridingpelican.com`;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(text);
@@ -91,16 +91,17 @@ export function GameOverModal({
           </div>
         </div>
 
-        <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 flex items-center justify-between text-xs font-mono text-slate-200">
+        <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-slate-200">
           <span>🐟 小鱼 {hud.pickups.fish}</span>
           <span>🦐 小虾 {hud.pickups.shrimp}</span>
           <span>⭐ 海星 {hud.pickups.starfish}</span>
           <span>🌿 海草 {hud.pickups.seaweed}</span>
+          <span>💡 车灯 {hud.pickups.lantern}</span>
         </div>
 
         <div className="mt-2 text-center text-[11px] font-medium text-amber-200/90 flex items-center justify-center gap-1.5">
           <span>🏆</span>
-          <span>已解锁里程碑成就：{hud.totalAchievementsUnlocked} / 6</span>
+          <span>已解锁里程碑成就：{hud.totalAchievementsUnlocked} / 7</span>
         </div>
 
         {/* Share Record Card Button */}

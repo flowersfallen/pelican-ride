@@ -110,6 +110,7 @@ export function GameHud({
               <span title="小虾（冲刺）">🦐 {hud.pickups.shrimp}</span>
               <span title="海星（升级）">⭐ {hud.pickups.starfish}</span>
               <span title="海草（抗浪护盾）">🌿 {hud.pickups.seaweed}</span>
+              <span title="探照车灯（强光夜巡）">💡 {hud.pickups.lantern}</span>
             </div>
           </div>
 
@@ -248,9 +249,10 @@ export function GameHud({
             </div>
           )}
 
-          {/* Active Buff / Combo / Drafting / Stunt Air / Shallow Water Badges */}
+          {/* Active Buff / Combo / Drafting / Stunt Air / Headlight / Shallow Water Badges */}
           {(hud.boostRemainingSec > 0 ||
             hud.shieldRemainingSec > 0 ||
+            hud.headlightRemainingSec > 0 ||
             hud.inShallowWater ||
             hud.comboCount >= 2 ||
             hud.isDrafting ||
@@ -275,6 +277,12 @@ export function GameHud({
                 <span className="inline-flex items-center gap-1 rounded-full bg-cyan-600/90 text-white px-2.5 py-0.5 text-[11px] font-bold shadow animate-pulse">
                   <span>💨</span>
                   <span>尾流破风中 +15% 极速</span>
+                </span>
+              )}
+              {hud.headlightRemainingSec > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-400 text-slate-950 px-2.5 py-0.5 text-[11px] font-extrabold shadow animate-pulse">
+                  <span>💡</span>
+                  <span>探照强光 {hud.headlightRemainingSec}s</span>
                 </span>
               )}
               {hud.boostRemainingSec > 0 && (

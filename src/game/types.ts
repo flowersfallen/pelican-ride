@@ -1,6 +1,6 @@
 export type HatStyle = 'cap' | 'straw' | 'visor' | 'crown';
 
-export type CollectibleType = 'fish' | 'shrimp' | 'starfish' | 'seaweed';
+export type CollectibleType = 'fish' | 'shrimp' | 'starfish' | 'seaweed' | 'lantern';
 
 export type DisasterPhase = 'calm' | 'warning' | 'active' | 'receding';
 
@@ -57,6 +57,7 @@ export interface PickupCounts {
   shrimp: number;
   starfish: number;
   seaweed: number;
+  lantern: number;
 }
 
 export interface GameHudState {
@@ -74,6 +75,7 @@ export interface GameHudState {
   tsunamisSurvived: number;
   boostRemainingSec: number;
   shieldRemainingSec: number;
+  headlightRemainingSec: number;
   inShallowWater: boolean;
   isGameOver: boolean;
   isMuted: boolean;

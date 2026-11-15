@@ -71,7 +71,9 @@ class CoastalAudioEngine {
 
     const now = this.ctx.currentTime;
     const notes =
-      type === 'starfish'
+      type === 'lantern'
+        ? [784.0, 1046.5, 1318.5]
+        : type === 'starfish'
         ? [587.3, 880, 1174.7]
         : type === 'shrimp'
         ? [659.2, 987.8]

@@ -39,8 +39,8 @@ export const UPGRADE_TIERS: UpgradeTier[] = [
   {
     level: 1,
     name: 'Lv.1 海岸木架车',
-    cruiseSpeed: 11.2,
-    maxForwardSpeed: 18.8,
+    cruiseSpeed: 7.2, // Relaxed casual cruise; slower than 14.8 m/s tsunami so idle riders get caught
+    maxForwardSpeed: 17.5, // 56 km/h when pressing accelerate (W / Up / touch)
     steerSpeed: 8.6,
     frameTint: 0xe14d2a,
     starsNeeded: 3,
@@ -48,8 +48,8 @@ export const UPGRADE_TIERS: UpgradeTier[] = [
   {
     level: 2,
     name: 'Lv.2 海风公路车',
-    cruiseSpeed: 12.6,
-    maxForwardSpeed: 22.0,
+    cruiseSpeed: 8.0,
+    maxForwardSpeed: 21.0,
     steerSpeed: 9.8,
     frameTint: 0x0284c7,
     starsNeeded: 4,
@@ -57,8 +57,8 @@ export const UPGRADE_TIERS: UpgradeTier[] = [
   {
     level: 3,
     name: 'Lv.3 气动破浪车',
-    cruiseSpeed: 14.0,
-    maxForwardSpeed: 25.5,
+    cruiseSpeed: 8.8,
+    maxForwardSpeed: 24.5,
     steerSpeed: 11.0,
     frameTint: 0x0f766e,
     starsNeeded: 5,
@@ -66,8 +66,8 @@ export const UPGRADE_TIERS: UpgradeTier[] = [
   {
     level: 4,
     name: 'Lv.4 黄金踏浪传奇',
-    cruiseSpeed: 15.6,
-    maxForwardSpeed: 29.5,
+    cruiseSpeed: 9.6, // Still comfortably below tsunami speed
+    maxForwardSpeed: 28.5,
     steerSpeed: 12.2,
     frameTint: 0xf59e0b,
     starsNeeded: 99,

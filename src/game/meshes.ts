@@ -233,13 +233,14 @@ export function createPelicanRiderMesh(
   cargoFish.position.set(0.04, 0.18, -0.2);
   handlebarGroup.add(cargoFish);
 
-  // Chrome bike headlamp mounted below basket
+  // Chrome bike headlamp mounted below basket (hidden by default, activates with lantern power-up)
   const headlampCasing = new THREE.Mesh(
     new THREE.CylinderGeometry(0.07, 0.055, 0.12, 8),
     new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.8, roughness: 0.2 }),
   );
   headlampCasing.rotation.x = Math.PI / 2;
   headlampCasing.position.set(0, -0.08, -0.28);
+  headlampCasing.visible = false;
   handlebarGroup.add(headlampCasing);
 
   const headlightMesh = new THREE.Mesh(
@@ -248,9 +249,10 @@ export function createPelicanRiderMesh(
   );
   headlightMesh.position.set(0, -0.08, -0.34);
   headlightMesh.rotation.y = Math.PI;
+  headlightMesh.visible = false;
   handlebarGroup.add(headlightMesh);
 
-  // Subtle forward headlamp conical beam for evening/night
+  // Forward headlamp conical beam (hidden by default; only activates as an item power-up effect)
   const headlightBeam = new THREE.Mesh(
     new THREE.ConeGeometry(1.6, 12, 10, 1, true),
     new THREE.MeshBasicMaterial({
@@ -263,6 +265,7 @@ export function createPelicanRiderMesh(
   );
   headlightBeam.rotation.x = -Math.PI / 2;
   headlightBeam.position.set(0, -0.08, -6.34);
+  headlightBeam.visible = false;
   handlebarGroup.add(headlightBeam);
 
   // Ruby taillight under rear seat
@@ -444,6 +447,8 @@ export function createCollectibleMesh(type: CollectibleType): THREE.Group {
       ? 0xfb7185
       : type === 'starfish'
       ? 0xfacc15
+      : type === 'lantern'
+      ? 0xfbbf24
       : 0x34d399;
 
   // Ground beacon ring for instant readability from afar
@@ -509,6 +514,29 @@ export function createCollectibleMesh(type: CollectibleType): THREE.Group {
     }
     const core = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), starMat);
     item.add(core);
+  } else if (type === 'lantern') {
+    const brassMat = new THREE.MeshStandardMaterial({
+      color: 0xf59e0b,
+      emissive: 0xd97706,
+      emissiveIntensity: 0.5,
+      roughness: 0.25,
+      metalness: 0.75,
+      flatShading: true,
+    });
+    // Vintage bicycle headlamp casing with glowing bulb
+    const casing = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.42, 8), brassMat);
+    casing.rotation.x = Math.PI / 2;
+    const bulb = new THREE.Mesh(
+      new THREE.SphereGeometry(0.18, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xfef08a }),
+    );
+    bulb.position.z = -0.14;
+    const bracket = new THREE.Mesh(
+      new THREE.TorusGeometry(0.15, 0.03, 6, 12),
+      brassMat,
+    );
+    bracket.position.y = 0.25;
+    item.add(casing, bulb, bracket);
   } else {
     const kelpMat = new THREE.MeshStandardMaterial({
       color: 0x10b981,

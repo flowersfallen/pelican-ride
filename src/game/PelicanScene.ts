@@ -179,6 +179,7 @@ export class PelicanScene {
   private graphicQuality: GraphicQuality = 'high';
   private lightningTimer = 0;
   private lightningFlashTimer = 0;
+  private headlightTimer = 0;
 
   // Combo & Drafting Mechanics
   private comboCount = 0;
@@ -205,6 +206,7 @@ export class PelicanScene {
     shrimp: 0,
     starfish: 0,
     seaweed: 0,
+    lantern: 0,
   };
   private bestDistance = 0;
   private isGameOver = false;
@@ -572,11 +574,11 @@ export class PelicanScene {
       this.scene.add(sign);
     }
 
-    // Wooden Boardwalk Jump Ramps
-    const rampZPositions = [-60, -150, -240];
+    // Wooden Boardwalk Jump Ramps (placed in outer lanes so idle cruising straight at 1.6 doesn't auto-hit)
+    const rampZPositions = [-75, -165, -255];
     for (let i = 0; i < rampZPositions.length; i++) {
       const ramp = createJumpRampMesh();
-      const laneX = i % 2 === 0 ? -2.2 : 2.2;
+      const laneX = i % 2 === 0 ? -3.6 : 3.8;
       ramp.position.set(laneX, 0, rampZPositions[i]);
       this.jumpRamps.push(ramp);
       this.scene.add(ramp);
@@ -740,9 +742,10 @@ export class PelicanScene {
     this.steerAngle = 0;
     this.boostTimer = 0;
     this.shieldTimer = 0;
+    this.headlightTimer = 0;
     this.isGameOver = false;
     this.tsunamisSurvived = 0;
-    this.pickups = { fish: 0, shrimp: 0, starfish: 0, seaweed: 0 };
+    this.pickups = { fish: 0, shrimp: 0, starfish: 0, seaweed: 0, lantern: 0 };
     this.bannerText = '全新旅程开启 · 海风轻拂';
     this.bannerTimer = 2.6;
 
@@ -755,9 +758,9 @@ export class PelicanScene {
       seg.position.z = -i * SEGMENT_LENGTH;
     });
 
-    const rampZPositions = [-60, -150, -240];
+    const rampZPositions = [-75, -165, -255];
     this.jumpRamps.forEach((ramp, idx) => {
-      ramp.position.set(idx % 2 === 0 ? -2.2 : 2.2, 0, rampZPositions[idx] || -60);
+      ramp.position.set(idx % 2 === 0 ? -3.6 : 3.8, 0, rampZPositions[idx] || -75);
     });
 
     this.spawnCompanions();
@@ -789,7 +792,7 @@ export class PelicanScene {
   private enterActiveTsunami(): void {
     this.disasterPhase = 'active';
     this.phaseTimer = this.disasterMeta.activeDurationSec;
-    this.waveGap = 12.8;
+    this.waveGap = 13.0;
     this.submergedTimer = 0;
     this.tsunamiRig.group.visible = true;
     this.bannerText = '🌊 海啸来袭！按住前进加速，吃鱼虾海星逃离巨浪！';
@@ -820,16 +823,30 @@ export class PelicanScene {
     if (this.collectibles.length >= 22) return;
     const roll = Math.random();
     const type: CollectibleType =
-      roll < 0.34
+      roll < 0.28
         ? 'fish'
-        : roll < 0.6
+        : roll < 0.52
         ? 'shrimp'
-        : roll < 0.82
+        : roll < 0.72
         ? 'starfish'
-        : 'seaweed';
+        : roll < 0.88
+        ? 'seaweed'
+        : 'lantern';
 
     const mesh = createCollectibleMesh(type);
-    const x = -4.8 + Math.random() * 9.6;
+
+    // Intentional lane distribution: avoid the straight-line idle corridor [0.5, 2.7] around X = 1.6!
+    // Players MUST actively steer left or right to collect bonuses.
+    const laneRoll = Math.random();
+    let x: number;
+    if (laneRoll < 0.38) {
+      x = -4.6 + Math.random() * 2.0; // Seaward Left lane (-4.6 to -2.6)
+    } else if (laneRoll < 0.72) {
+      x = -2.0 + Math.random() * 1.4; // Center-left lane (-2.0 to -0.6)
+    } else {
+      x = 3.2 + Math.random() * 1.6; // Beach Right lane (3.2 to 4.8)
+    }
+
     const z = customZ ?? this.playerZ - 58 - Math.random() * 24;
     mesh.position.set(x, 0, z);
     this.scene.add(mesh);
@@ -964,6 +981,7 @@ export class PelicanScene {
       shrimp: 0xf97316,
       starfish: 0xfacc15,
       seaweed: 0x34d399,
+      lantern: 0xfbbf24,
     };
     this.spawnPopBurst(item.mesh.position, colorMap[item.type]);
 
@@ -982,6 +1000,13 @@ export class PelicanScene {
       xpGain = 2;
       this.bannerText = this.comboCount >= 2 ? `⭐ 连击 x${this.comboCount}！海星升级双倍` : '⭐ 收集海星！升级经验 +2';
       this.bannerTimer = 1.6;
+    } else if (item.type === 'lantern') {
+      this.headlightTimer = 9.0;
+      this.boostTimer = Math.max(this.boostTimer, 2.0);
+      this.speed = Math.max(this.speed, getTierForLevel(this.level).maxForwardSpeed + 3.5);
+      this.bannerText = '💡 探照强光！点亮海岸公路 · 破雾疾驰';
+      this.bannerTimer = 2.4;
+      coastalAudio.playWhoosh();
     } else {
       this.shieldTimer = Math.max(this.shieldTimer, 6.0);
       this.boostTimer = Math.max(this.boostTimer, 1.8);
@@ -1039,6 +1064,7 @@ export class PelicanScene {
 
     if (this.boostTimer > 0) this.boostTimer = Math.max(0, this.boostTimer - dt);
     if (this.shieldTimer > 0) this.shieldTimer = Math.max(0, this.shieldTimer - dt);
+    if (this.headlightTimer > 0) this.headlightTimer = Math.max(0, this.headlightTimer - dt);
     if (this.beakSnapTimer > 0) this.beakSnapTimer = Math.max(0, this.beakSnapTimer - dt);
     if (this.bannerTimer > 0) {
       this.bannerTimer = Math.max(0, this.bannerTimer - dt);
@@ -1068,7 +1094,9 @@ export class PelicanScene {
     const comboBonus = this.comboCount >= 2 ? Math.min(4.8, (this.comboCount - 1) * 1.2) : 0;
 
     // Determine target forward/reverse velocity
-    const boostBonus = (this.boostTimer > 0 ? 7.5 : this.shieldTimer > 0 ? 2.5 : 0) + comboBonus;
+    const boostBonus =
+      (this.boostTimer > 0 ? 7.5 : this.shieldTimer > 0 ? 2.5 : this.headlightTimer > 0 ? 3.5 : 0) +
+      comboBonus;
     const inShallowWater = this.disasterPhase === 'active' && this.playerX < -1.9;
     const waterDrag = inShallowWater && this.shieldTimer <= 0 ? 0.78 : 1;
 
@@ -1129,11 +1157,11 @@ export class PelicanScene {
       }
     }
 
-    // Jump ramps recycling & ramp jump trigger
+    // Jump ramps recycling & ramp jump trigger (recycled ramps are kept on outer lanes)
     for (const ramp of this.jumpRamps) {
       if (ramp.position.z > this.playerZ + 25) {
         ramp.position.z -= 3 * 90;
-        ramp.position.x = (Math.random() > 0.5 ? 1 : -1) * (1.6 + Math.random() * 1.4);
+        ramp.position.x = Math.random() > 0.5 ? (3.4 + Math.random() * 0.8) : (-3.4 - Math.random() * 0.8);
       }
     }
 
@@ -1224,9 +1252,10 @@ export class PelicanScene {
         this.enterActiveTsunami();
       }
     } else if (this.disasterPhase === 'active') {
-      // Tsunami chases slightly faster than passive auto-cruise so idle players get caught,
-      // while manual acceleration or fish/shrimp boosts pull comfortably ahead.
-      const waveChaseSpeed = 13.6 + Math.min(2.2, distanceMeters / 2500);
+      // Tsunami chases significantly faster than passive auto-cruise (14.8 m/s vs 7.2 m/s),
+      // so idle players who don't actively pedal/accelerate WILL be caught and wiped out within ~1.8 seconds!
+      // While manual acceleration (17.5+ m/s) or fish/shrimp boosts pull comfortably ahead.
+      const waveChaseSpeed = 14.8 + Math.min(3.2, distanceMeters / 1500);
       this.waveGap = THREE.MathUtils.clamp(
         this.waveGap + (this.speed - waveChaseSpeed) * dt,
         0,
@@ -1368,7 +1397,6 @@ export class PelicanScene {
     let targetSunColor: THREE.Color;
     let targetSunIntensity: number;
     let targetStarOpacity = 0;
-    let targetHeadlightOpacity = 0;
 
     if (this.timeOfDay === 'sunset') {
       targetSkyColor = new THREE.Color(0xf97316); // Amber Sunset
@@ -1377,7 +1405,6 @@ export class PelicanScene {
       targetSunColor = new THREE.Color(0xf59e0b);
       targetSunIntensity = 1.15;
       targetStarOpacity = 0.2;
-      targetHeadlightOpacity = 0.35;
     } else if (this.timeOfDay === 'night') {
       targetSkyColor = new THREE.Color(0x090d16); // Starry Deep Night
       targetHemiSky = new THREE.Color(0x1e293b);
@@ -1385,7 +1412,6 @@ export class PelicanScene {
       targetSunColor = new THREE.Color(0x38bdf8); // Pale blue moon
       targetSunIntensity = 0.55;
       targetStarOpacity = 0.95;
-      targetHeadlightOpacity = 0.85;
     } else if (this.timeOfDay === 'dawn') {
       targetSkyColor = new THREE.Color(0xf472b6); // Rose Dawn
       targetHemiSky = new THREE.Color(0xfce7f3);
@@ -1393,7 +1419,6 @@ export class PelicanScene {
       targetSunColor = new THREE.Color(0xfde047);
       targetSunIntensity = 1.05;
       targetStarOpacity = 0.1;
-      targetHeadlightOpacity = 0.15;
     } else {
       // Noon (Cerulean sunny day)
       targetSkyColor = this.skyCalmColor;
@@ -1402,7 +1427,6 @@ export class PelicanScene {
       targetSunColor = new THREE.Color(0xfffbeb);
       targetSunIntensity = 1.35;
       targetStarOpacity = 0;
-      targetHeadlightOpacity = 0;
     }
 
     if (isThreat) {
@@ -1442,10 +1466,17 @@ export class PelicanScene {
     this.starfield.position.z = this.playerZ;
     this.starfield.rotation.y += dt * 0.005;
 
-    // Headlight cone opacity & taillight
+    // Bicycle Headlamp: removed from default passive state; only projects as an active power-up effect!
+    const isHeadlightActive = this.headlightTimer > 0;
     if (this.playerRig.headlightBeam) {
-      const hMat = this.playerRig.headlightBeam.material as THREE.MeshBasicMaterial;
-      hMat.opacity += (targetHeadlightOpacity - hMat.opacity) * Math.min(1, 3 * dt);
+      this.playerRig.headlightBeam.visible = isHeadlightActive;
+      if (isHeadlightActive) {
+        const hMat = this.playerRig.headlightBeam.material as THREE.MeshBasicMaterial;
+        hMat.opacity = Math.min(0.85, this.headlightTimer * 0.35);
+      }
+    }
+    if (this.playerRig.headlightMesh) {
+      this.playerRig.headlightMesh.visible = isHeadlightActive;
     }
 
     // Bioluminescent foam and ocean glow during night ("Blue Tears" / 荧光海蓝眼泪)
@@ -1596,10 +1627,10 @@ export class PelicanScene {
     this.spawnTimer -= dt;
     const spawnInterval =
       this.disasterPhase === 'active'
-        ? 0.72
+        ? 2.2
         : this.disasterPhase === 'warning'
-        ? 0.95
-        : 3.4;
+        ? 2.6
+        : 3.5;
     if (this.spawnTimer <= 0) {
       this.spawnTimer = spawnInterval;
       this.spawnCollectible();
@@ -1789,6 +1820,7 @@ export class PelicanScene {
       tsunamisSurvived: this.tsunamisSurvived,
       boostRemainingSec: Number(this.boostTimer.toFixed(1)),
       shieldRemainingSec: Number(this.shieldTimer.toFixed(1)),
+      headlightRemainingSec: Number(this.headlightTimer.toFixed(1)),
       inShallowWater: this.disasterPhase === 'active' && this.playerX < -1.9,
       isGameOver: this.isGameOver,
       isMuted: coastalAudio.isMuted(),
