@@ -299,6 +299,26 @@ export function GameHud({
                   </span>
                 </span>
               )}
+              {hud.isDrifting && (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold shadow animate-bounce ${
+                    hud.driftChargeLevel === 2
+                      ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950'
+                      : hud.driftChargeLevel === 1
+                      ? 'bg-cyan-500 text-white'
+                      : 'bg-slate-700 text-slate-200'
+                  }`}
+                >
+                  <span>⚡</span>
+                  <span>
+                    {hud.driftChargeLevel === 2
+                      ? '🔥 黄金超压蓄力！松刹车释放'
+                      : hud.driftChargeLevel === 1
+                      ? '💨 迷你涡轮蓄力中…'
+                      : '弯道漂移中'}
+                  </span>
+                </span>
+              )}
               {hud.isDrafting && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-cyan-600/90 text-white px-2.5 py-0.5 text-[11px] font-bold shadow animate-pulse">
                   <span>💨</span>

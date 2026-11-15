@@ -20,12 +20,14 @@ import {
   createStarfield,
   createTrafficConeMesh,
   createTsunamiWallMesh,
+  createWindTurbineMesh,
   DolphinRig,
   LighthouseRig,
   PelicanRig,
   SeagullRig,
   TrafficConeRig,
   TsunamiRig,
+  WindTurbineRig,
 } from './meshes';
 import {
   createRandomPelicanIdentity,
@@ -138,6 +140,12 @@ export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
     desc: '撞飞或机敏避开路面交通警示锥！',
     icon: '🚧',
   },
+  drift_master: {
+    id: 'drift_master',
+    title: '海滨甩尾',
+    desc: '弯道减速甩尾漂移，释放迷你涡轮喷射！',
+    icon: '⚡',
+  },
 };
 
 export class PelicanScene {
@@ -182,6 +190,8 @@ export class PelicanScene {
   private jumpRamps: THREE.Group[] = [];
   private crabs: CrabRig[] = [];
   private trafficCones: TrafficConeRig[] = [];
+  private windTurbines: WindTurbineRig[] = [];
+  private skidMarks: THREE.Mesh[] = [];
   private rainRig!: { lineSegments: THREE.LineSegments; positions: Float32Array; count: number };
   private cameraMode: 'action' | 'chill' | 'drone' = 'action';
   private lastWhooshTime = 0;
@@ -200,6 +210,12 @@ export class PelicanScene {
   private beakSnapTimer = 0;
   private bellRingTimer = 0;
   private bellRingCount = 0;
+
+  // Drift & Mini-Turbo Mechanics
+  private isDrifting = false;
+  private driftTimer = 0;
+  private driftChargeLevel = 0;
+  private miniTurboTimer = 0;
 
   // Aerial Stunt Jump & State
   private isJumpingAir = false;
@@ -224,6 +240,7 @@ export class PelicanScene {
     totalPickups: 0,
     maxSpeedKmh: 0,
     totalJumps: 0,
+    totalDriftTurbos: 0,
   };
 
   // Achievements
@@ -294,6 +311,7 @@ export class PelicanScene {
           totalPickups: Number(parsed.totalPickups) || 0,
           maxSpeedKmh: Number(parsed.maxSpeedKmh) || 0,
           totalJumps: Number(parsed.totalJumps) || 0,
+          totalDriftTurbos: Number(parsed.totalDriftTurbos) || 0,
         };
       }
     } catch {
@@ -663,6 +681,36 @@ export class PelicanScene {
     // Coastal Rain particle line segments
     this.rainRig = createRainSystem();
     this.scene.add(this.rainRig.lineSegments);
+
+    // Offshore Wind Turbines in deep seaward water (-X)
+    for (let i = 0; i < 3; i++) {
+      const turbine = createWindTurbineMesh();
+      turbine.baseX = -58 - i * 16;
+      turbine.baseZ = -60 - i * 85;
+      turbine.group.position.set(turbine.baseX, 0, turbine.baseZ);
+      this.windTurbines.push(turbine);
+      this.scene.add(turbine.group);
+    }
+  }
+
+  private spawnSkidMark(x: number, z: number, intensity: number): void {
+    if (this.skidMarks.length >= 45) {
+      const old = this.skidMarks.shift();
+      if (old) this.scene.remove(old);
+    }
+    const skidGeo = new THREE.PlaneGeometry(0.24, 0.95);
+    const skidMat = new THREE.MeshBasicMaterial({
+      color: 0x0f172a,
+      transparent: true,
+      opacity: Math.min(0.55, 0.25 + intensity * 0.3),
+      depthWrite: false,
+    });
+    const mark = new THREE.Mesh(skidGeo, skidMat);
+    mark.rotation.x = -Math.PI / 2;
+    mark.rotation.z = this.steerAngle * 0.15;
+    mark.position.set(x, 0.014, z);
+    this.scene.add(mark);
+    this.skidMarks.push(mark);
   }
 
   private saveLifetimeStats(): void {
@@ -830,6 +878,13 @@ export class PelicanScene {
     this.isPaused = false;
     this.isJumpingAir = false;
     this.airJumpTimer = 0;
+    this.isDrifting = false;
+    this.driftTimer = 0;
+    this.driftChargeLevel = 0;
+    this.miniTurboTimer = 0;
+    this.skidMarks.forEach((m) => this.scene.remove(m));
+    this.skidMarks = [];
+    coastalAudio.stopDriftScreech();
     this.playerX = 1.6;
     this.playerZ = 0;
     this.playerRig.group.rotation.set(0, 0, 0);
@@ -1225,24 +1280,120 @@ export class PelicanScene {
     const inShallowWater = this.disasterPhase === 'active' && this.playerX < -1.9;
     const waterDrag = inShallowWater && this.shieldTimer <= 0 ? 0.78 : 1;
 
+    // Arcade Drift & Mini-Turbo System check
+    const wantsDrift =
+      this.input.brake && (this.input.left || this.input.right) && (this.speed > 5.5 || this.isDrifting);
+
     let targetSpeed = (tier.cruiseSpeed + boostBonus) * draftingBonus; // Auto-cruise with bonuses
-    if (this.input.brake) {
+    let accelRate = 7.5;
+
+    if (wantsDrift && !this.isJumpingAir) {
+      // In power-drift mode: retain high-speed forward gliding momentum so players can slide and charge mini-turbo!
+      targetSpeed = Math.max(7.8, this.speed * 0.94);
+      accelRate = 3.2;
+    } else if (this.input.brake) {
       targetSpeed = -4.8; // Brake and reverse pedal
+      accelRate = 18;
     } else if (this.input.accelerate || this.boostTimer > 0) {
       targetSpeed = (tier.maxForwardSpeed + boostBonus) * waterDrag * draftingBonus;
+      accelRate = 14;
     } else {
       targetSpeed = targetSpeed * waterDrag;
+      accelRate = 7.5;
     }
 
-    const accelRate = this.input.brake ? 18 : this.input.accelerate ? 14 : 7.5;
     this.speed += (targetSpeed - this.speed) * Math.min(1, accelRate * dt);
     this.playerZ -= this.speed * dt;
+
+    // Continuous dynamic ocean headwind audio synthesis
+    coastalAudio.updateHeadwind(this.speed);
 
     // Career lifetime stats accumulation
     this.lifetimeStats.totalDistanceMeters += this.speed * dt;
     const curSpeedKmh = Math.round(this.speed * 3.2);
     if (curSpeedKmh > this.lifetimeStats.maxSpeedKmh) {
       this.lifetimeStats.maxSpeedKmh = curSpeedKmh;
+    }
+
+    // Arcade Drift & Mini-Turbo System
+    if (wantsDrift && !this.isJumpingAir) {
+      if (!this.isDrifting) {
+        this.isDrifting = true;
+        this.driftTimer = 0;
+        this.driftChargeLevel = 0;
+        coastalAudio.startDriftScreech();
+      }
+
+      this.driftTimer += dt;
+      if (this.driftTimer >= 1.35) {
+        this.driftChargeLevel = 2; // Gold ultra turbo
+      } else if (this.driftTimer >= 0.55) {
+        this.driftChargeLevel = 1; // Blue mini turbo
+      } else {
+        this.driftChargeLevel = 0;
+      }
+
+      // Spawn skid mark decals on asphalt
+      if (Math.random() < 0.65) {
+        this.spawnSkidMark(this.playerX + (this.input.left ? 0.2 : -0.2), this.playerZ + 0.6, 1.0);
+      }
+
+      // Drift sparks and friction tire smoke
+      if (Math.random() < 0.8) {
+        const sparkColor =
+          this.driftChargeLevel === 2 ? 0xfbbf24 : this.driftChargeLevel === 1 ? 0x38bdf8 : 0x94a3b8;
+        const sparkMesh = new THREE.Mesh(
+          new THREE.SphereGeometry(this.driftChargeLevel >= 1 ? 0.15 : 0.08, 4, 4),
+          new THREE.MeshBasicMaterial({ color: sparkColor, transparent: true, opacity: 0.85 }),
+        );
+        sparkMesh.position.set(
+          this.playerX + (this.input.left ? 0.35 : -0.35),
+          0.12,
+          this.playerZ + 0.65,
+        );
+        this.scene.add(sparkMesh);
+        this.particles.push({
+          mesh: sparkMesh,
+          vel: new THREE.Vector3(
+            (this.input.left ? 2.5 : -2.5) + (Math.random() - 0.5) * 2,
+            0.8 + Math.random() * 1.8,
+            4.0 + Math.random() * 3.5,
+          ),
+          life: 0.28,
+        });
+      }
+    } else {
+      // Release drift -> Trigger Mini-Turbo Boost!
+      if (this.isDrifting) {
+        coastalAudio.stopDriftScreech();
+        if (this.driftChargeLevel >= 1) {
+          const boostAmount = this.driftChargeLevel === 2 ? 10.5 : 5.8;
+          const boostTime = this.driftChargeLevel === 2 ? 2.5 : 1.3;
+          this.boostTimer = Math.max(this.boostTimer, boostTime);
+          this.speed += boostAmount;
+          this.miniTurboTimer = 0.8;
+          this.lifetimeStats.totalDriftTurbos += 1;
+          this.saveLifetimeStats();
+          coastalAudio.playMiniTurbo();
+          this.checkAchievement('drift_master');
+          this.bannerText =
+            this.driftChargeLevel === 2 ? '⚡ 黄金超压涡轮喷射！极速狂飙' : '💨 迷你漂移涡轮喷射！';
+          this.bannerTimer = 1.8;
+          try {
+            navigator.vibrate?.(this.driftChargeLevel === 2 ? [30, 20, 50] : [35]);
+          } catch {}
+        }
+        this.isDrifting = false;
+        this.driftTimer = 0;
+        this.driftChargeLevel = 0;
+      }
+    }
+
+    if (this.miniTurboTimer > 0) this.miniTurboTimer = Math.max(0, this.miniTurboTimer - dt);
+
+    // Hard brake skid marks when not drifting
+    if (this.input.brake && this.speed > 5 && !this.isDrifting && Math.random() < 0.35) {
+      this.spawnSkidMark(this.playerX, this.playerZ + 0.6, 0.5);
     }
 
     // Freewheel ratchet ASMR click when coasting without pedaling
@@ -1830,6 +1981,24 @@ export class PelicanScene {
       this.lighthouseRig.group.position.z = this.playerZ - 280;
     }
 
+    // Offshore wind turbines rotation & recycling
+    for (const turbine of this.windTurbines) {
+      turbine.rotorGroup.rotation.z += turbine.rotorSpeed * dt;
+      turbine.beaconMesh.visible = Math.sin(elapsedSec * 4) > 0.25;
+      if (turbine.group.position.z > this.playerZ + 60) {
+        turbine.group.position.z -= 3 * 85;
+      }
+    }
+
+    // Asphalt tire skid marks recycling
+    for (let i = this.skidMarks.length - 1; i >= 0; i--) {
+      const sm = this.skidMarks[i];
+      if (sm.position.z > this.playerZ + 35) {
+        this.scene.remove(sm);
+        this.skidMarks.splice(i, 1);
+      }
+    }
+
     // Coastal seagulls flight dynamics & storm evacuation
     for (let i = 0; i < this.seagulls.length; i++) {
       const gull = this.seagulls[i];
@@ -2004,11 +2173,19 @@ export class PelicanScene {
     rig.rightLeg.position.y = 0.92 - Math.sin(this.pedalPhase) * 0.08;
 
     // Banking into turns & steering front wheel/handlebar
-    const targetBank = -steerInput * 0.16;
-    rig.bodyGroup.rotation.z += (targetBank - rig.bodyGroup.rotation.z) * Math.min(1, 10 * dt);
+    const targetBank = this.isDrifting ? (this.input.left ? 0.32 : -0.32) : -steerInput * 0.16;
+    rig.bodyGroup.rotation.z += (targetBank - rig.bodyGroup.rotation.z) * Math.min(1, 12 * dt);
     const targetBarYaw = -steerInput * 0.28;
     rig.handlebarGroup.rotation.y +=
       (targetBarYaw - rig.handlebarGroup.rotation.y) * Math.min(1, 12 * dt);
+
+    // Dynamic yaw slide when drifting
+    if (this.isDrifting) {
+      const driftYaw = this.input.left ? -0.32 : 0.32;
+      rig.bodyGroup.rotation.y += (driftYaw - rig.bodyGroup.rotation.y) * Math.min(1, 10 * dt);
+    } else {
+      rig.bodyGroup.rotation.y += (0 - rig.bodyGroup.rotation.y) * Math.min(1, 10 * dt);
+    }
 
     // Subtle forward lean when accelerating
     const leanPitch = this.input.accelerate || this.boostTimer > 0 ? -0.07 : this.input.brake ? 0.08 : 0;
@@ -2102,8 +2279,20 @@ export class PelicanScene {
       graphicQuality: this.graphicQuality,
       isJumpingAir: this.isJumpingAir,
       isRaining: this.isRaining,
+      isDrifting: this.isDrifting,
+      driftChargeLevel: this.driftChargeLevel,
+      masterVolume: coastalAudio.getMasterVolume(),
       lifetimeStats: { ...this.lifetimeStats },
     });
+  }
+
+  public setMasterVolume(vol: number): void {
+    coastalAudio.setMasterVolume(vol);
+    this.emitHud();
+  }
+
+  public getMasterVolume(): number {
+    return coastalAudio.getMasterVolume();
   }
 
   private handleResize(): void {

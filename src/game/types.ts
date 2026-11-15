@@ -16,7 +16,8 @@ export type AchievementId =
   | 'stunt_rider'
   | 'crab_whisperer'
   | 'lantern_keeper'
-  | 'traffic_slalom';
+  | 'traffic_slalom'
+  | 'drift_master';
 
 export type GraphicQuality = 'high' | 'battery_saver';
 
@@ -33,6 +34,7 @@ export interface LifetimeStats {
   totalPickups: number;
   maxSpeedKmh: number;
   totalJumps: number;
+  totalDriftTurbos: number;
 }
 
 export interface PelicanIdentity {
@@ -104,5 +106,8 @@ export interface GameHudState {
   graphicQuality: GraphicQuality;
   isJumpingAir: boolean;
   isRaining: boolean;
+  isDrifting: boolean;
+  driftChargeLevel: number;
+  masterVolume: number;
   lifetimeStats: LifetimeStats;
 }

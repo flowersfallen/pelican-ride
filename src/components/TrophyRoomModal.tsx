@@ -18,6 +18,7 @@ const ALL_ACHIEVEMENT_IDS: AchievementId[] = [
   'crab_whisperer',
   'lantern_keeper',
   'traffic_slalom',
+  'drift_master',
 ];
 
 export function TrophyRoomModal({ hud, onClose }: TrophyRoomModalProps) {
@@ -44,6 +45,7 @@ export function TrophyRoomModal({ hud, onClose }: TrophyRoomModalProps) {
     totalPickups: Object.values(hud.pickups).reduce((a, b) => a + b, 0),
     maxSpeedKmh: hud.speedKmh,
     totalJumps: 0,
+    totalDriftTurbos: 0,
   };
 
   return (
@@ -85,34 +87,40 @@ export function TrophyRoomModal({ hud, onClose }: TrophyRoomModalProps) {
               <Award className="w-3.5 h-3.5 text-amber-400" />
               生涯历程总览
             </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center font-mono">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-center font-mono">
               <div className="rounded-2xl bg-white/5 border border-white/10 p-2.5">
                 <div className="text-[10px] text-slate-400">累计骑行</div>
-                <div className="text-sm sm:text-base font-extrabold text-white mt-1">
+                <div className="text-sm font-extrabold text-white mt-1">
                   {(stats.totalDistanceMeters / 1000).toFixed(2)} km
                 </div>
               </div>
               <div className="rounded-2xl bg-white/5 border border-white/10 p-2.5">
                 <div className="text-[10px] text-slate-400">躲过海啸</div>
-                <div className="text-sm sm:text-base font-extrabold text-sky-300 mt-1">
+                <div className="text-sm font-extrabold text-sky-300 mt-1">
                   {stats.totalTsunamisSurvived} 次
                 </div>
               </div>
               <div className="rounded-2xl bg-white/5 border border-white/10 p-2.5">
                 <div className="text-[10px] text-slate-400">极速纪录</div>
-                <div className="text-sm sm:text-base font-extrabold text-amber-300 mt-1">
+                <div className="text-sm font-extrabold text-amber-300 mt-1">
                   {stats.maxSpeedKmh} km/h
                 </div>
               </div>
               <div className="rounded-2xl bg-white/5 border border-white/10 p-2.5">
                 <div className="text-[10px] text-slate-400">特技腾空</div>
-                <div className="text-sm sm:text-base font-extrabold text-purple-300 mt-1">
+                <div className="text-sm font-extrabold text-purple-300 mt-1">
                   {stats.totalJumps} 次
                 </div>
               </div>
-              <div className="col-span-2 sm:col-span-1 rounded-2xl bg-white/5 border border-white/10 p-2.5">
-                <div className="text-[10px] text-slate-400">打捞海洋战利品</div>
-                <div className="text-sm sm:text-base font-extrabold text-emerald-300 mt-1">
+              <div className="rounded-2xl bg-white/5 border border-white/10 p-2.5">
+                <div className="text-[10px] text-slate-400">甩尾涡轮</div>
+                <div className="text-sm font-extrabold text-orange-400 mt-1">
+                  {stats.totalDriftTurbos || 0} 次
+                </div>
+              </div>
+              <div className="rounded-2xl bg-white/5 border border-white/10 p-2.5">
+                <div className="text-[10px] text-slate-400">海洋战利品</div>
+                <div className="text-sm font-extrabold text-emerald-300 mt-1">
                   {stats.totalPickups} 个
                 </div>
               </div>

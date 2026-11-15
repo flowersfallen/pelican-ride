@@ -7,6 +7,8 @@ import { CollectibleType } from './types';
 class CoastalAudioEngine {
   private ctx: AudioContext | null = null;
   private muted = false;
+  private masterVolume = 1.0;
+  private masterGain: GainNode | null = null;
   private sirenTimer: number | null = null;
   private waveRoarGain: GainNode | null = null;
   private waveRoarSource: AudioBufferSourceNode | null = null;
@@ -14,8 +16,28 @@ class CoastalAudioEngine {
   private surfGain: GainNode | null = null;
   private surfCycleTimer: number | null = null;
 
+  // Dynamic Headwind Ocean Breeze Synth
+  private windSource: AudioBufferSourceNode | null = null;
+  private windFilter: BiquadFilterNode | null = null;
+  private windGain: GainNode | null = null;
+
+  // Drift Screech Synth
+  private driftOsc: OscillatorNode | null = null;
+  private driftGain: GainNode | null = null;
+
   public isMuted(): boolean {
     return this.muted;
+  }
+
+  public getMasterVolume(): number {
+    return this.masterVolume;
+  }
+
+  public setMasterVolume(vol: number): void {
+    this.masterVolume = Math.max(0, Math.min(1, vol));
+    if (this.masterGain && this.ctx) {
+      this.masterGain.gain.setValueAtTime(this.masterVolume, this.ctx.currentTime);
+    }
   }
 
   public setMuted(muted: boolean): void {
@@ -24,6 +46,10 @@ class CoastalAudioEngine {
       this.stopSiren();
       this.stopWaveRoar();
       this.stopCalmSurf();
+      this.stopDriftScreech();
+      if (this.windGain && this.ctx) {
+        this.windGain.gain.setValueAtTime(0, this.ctx.currentTime);
+      }
     }
   }
 
@@ -40,6 +66,15 @@ class CoastalAudioEngine {
     if (this.ctx && this.ctx.state === 'suspended') {
       void this.ctx.resume();
     }
+    if (this.ctx && !this.masterGain) {
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.setValueAtTime(this.masterVolume, this.ctx.currentTime);
+      this.masterGain.connect(this.ctx.destination);
+    }
+  }
+
+  private getDestination(): AudioNode {
+    return this.masterGain || this.ctx!.destination;
   }
 
   public playBell(): void {
@@ -58,7 +93,7 @@ class CoastalAudioEngine {
       gain.gain.setValueAtTime(idx === 0 ? 0.14 : 0.06, now);
       gain.gain.exponentialRampToValueAtTime(0.0008, now + 0.55);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
       osc.start(now);
       osc.stop(now + 0.56);
     });
@@ -91,7 +126,7 @@ class CoastalAudioEngine {
       gain.gain.setValueAtTime(0.11, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
       osc.start(t);
       osc.stop(t + 0.24);
     });
@@ -113,7 +148,7 @@ class CoastalAudioEngine {
       gain.gain.setValueAtTime(0.14, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
       osc.start(t);
       osc.stop(t + 0.36);
     });
@@ -138,7 +173,7 @@ class CoastalAudioEngine {
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.68);
 
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
       osc.start(now);
       osc.stop(now + 0.7);
     };
@@ -187,7 +222,7 @@ class CoastalAudioEngine {
 
       source.connect(filter);
       filter.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
 
       source.start();
       this.waveRoarSource = source;
@@ -257,7 +292,7 @@ class CoastalAudioEngine {
 
       source.connect(filter);
       filter.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
 
       source.start();
       this.surfSource = source;
@@ -322,7 +357,7 @@ class CoastalAudioEngine {
       gain.gain.linearRampToValueAtTime(0.09, now + 0.12);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
       osc.start(now);
       osc.stop(now + 0.5);
     } catch {
@@ -347,7 +382,7 @@ class CoastalAudioEngine {
     gain.gain.setValueAtTime(0.16, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.68);
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getDestination());
     osc.start(now);
     osc.stop(now + 0.7);
   }
@@ -377,7 +412,7 @@ class CoastalAudioEngine {
 
       osc.connect(filter);
       filter.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
       osc.start(now);
       osc.stop(now + 0.26);
     } catch {
@@ -406,7 +441,7 @@ class CoastalAudioEngine {
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
 
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
       osc.start(now);
       osc.stop(now + 0.3);
     } catch {
@@ -435,7 +470,7 @@ class CoastalAudioEngine {
         gain.gain.exponentialRampToValueAtTime(0.001, noteStart + 0.38);
 
         osc.connect(gain);
-        gain.connect(this.ctx.destination);
+        gain.connect(this.getDestination());
         osc.start(noteStart);
         osc.stop(noteStart + 0.4);
       });
@@ -475,7 +510,7 @@ class CoastalAudioEngine {
 
       source.connect(filter);
       filter.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
       source.start();
     } catch {
       // Audio fallback
@@ -498,7 +533,7 @@ class CoastalAudioEngine {
       gain.gain.linearRampToValueAtTime(0.14, now + 0.04);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
       osc.start(now);
       osc.stop(now + 0.28);
     } catch {
@@ -521,7 +556,7 @@ class CoastalAudioEngine {
       gain.gain.setValueAtTime(0.12, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
       osc.start(now);
       osc.stop(now + 0.22);
     } catch {
@@ -543,7 +578,7 @@ class CoastalAudioEngine {
       gain.gain.setValueAtTime(0.025, now);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.022);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
       osc.start(now);
       osc.stop(now + 0.025);
     } catch {
@@ -566,7 +601,7 @@ class CoastalAudioEngine {
       gain.gain.setValueAtTime(0.13, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
       osc.start(now);
       osc.stop(now + 0.15);
     } catch {
@@ -590,9 +625,124 @@ class CoastalAudioEngine {
         gain.gain.setValueAtTime(0.045, now + dt);
         gain.gain.exponentialRampToValueAtTime(0.001, now + dt + 0.045);
         osc.connect(gain);
-        gain.connect(this.ctx.destination);
+        gain.connect(this.getDestination());
         osc.start(now + dt);
         osc.stop(now + dt + 0.05);
+      });
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public updateHeadwind(speed: number): void {
+    if (this.muted) {
+      if (this.windGain && this.ctx) this.windGain.gain.setValueAtTime(0, this.ctx.currentTime);
+      return;
+    }
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      if (!this.windSource) {
+        const bufferSize = this.ctx.sampleRate * 2;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        let lastOut = 0.0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          data[i] = (lastOut + 0.02 * white) / 1.02;
+          lastOut = data[i];
+          data[i] *= 2.8;
+        }
+        this.windSource = this.ctx.createBufferSource();
+        this.windSource.buffer = buffer;
+        this.windSource.loop = true;
+
+        this.windFilter = this.ctx.createBiquadFilter();
+        this.windFilter.type = 'bandpass';
+        this.windFilter.Q.value = 1.4;
+
+        this.windGain = this.ctx.createGain();
+        this.windGain.gain.setValueAtTime(0.0001, this.ctx.currentTime);
+
+        this.windSource.connect(this.windFilter);
+        this.windFilter.connect(this.windGain);
+        this.windGain.connect(this.getDestination());
+        this.windSource.start();
+      }
+
+      const now = this.ctx.currentTime;
+      const normSpeed = Math.max(0, Math.min(28, speed)) / 28;
+      const targetGain = normSpeed > 0.15 ? normSpeed * 0.055 : 0.0001;
+      const targetCutoff = 260 + normSpeed * 1100;
+
+      this.windGain?.gain.setTargetAtTime(targetGain, now, 0.12);
+      this.windFilter?.frequency.setTargetAtTime(targetCutoff, now, 0.12);
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public startDriftScreech(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      if (this.driftOsc) return;
+      const now = this.ctx.currentTime;
+      this.driftOsc = this.ctx.createOscillator();
+      this.driftGain = this.ctx.createGain();
+
+      this.driftOsc.type = 'sawtooth';
+      this.driftOsc.frequency.setValueAtTime(420, now);
+
+      this.driftGain.gain.setValueAtTime(0.0001, now);
+      this.driftGain.gain.linearRampToValueAtTime(0.065, now + 0.05);
+
+      this.driftOsc.connect(this.driftGain);
+      this.driftGain.connect(this.getDestination());
+      this.driftOsc.start(now);
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public stopDriftScreech(): void {
+    if (!this.driftOsc || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      this.driftGain?.gain.linearRampToValueAtTime(0.0001, now + 0.06);
+      this.driftOsc.stop(now + 0.07);
+    } catch {
+      // Fallback
+    } finally {
+      this.driftOsc = null;
+      this.driftGain = null;
+    }
+  }
+
+  public playMiniTurbo(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      // Dual-tone rising power surge chord
+      [523.25, 783.99, 1046.5].forEach((freq, idx) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.5, now + 0.22);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(now + idx * 0.015);
+        osc.stop(now + 0.28);
       });
     } catch {
       // Audio fallback

@@ -43,12 +43,16 @@ const INITIAL_HUD: GameHudState = {
   graphicQuality: 'high',
   isJumpingAir: false,
   isRaining: false,
+  isDrifting: false,
+  driftChargeLevel: 0,
+  masterVolume: 1.0,
   lifetimeStats: {
     totalDistanceMeters: 0,
     totalTsunamisSurvived: 0,
     totalPickups: 0,
     maxSpeedKmh: 0,
     totalJumps: 0,
+    totalDriftTurbos: 0,
   },
 };
 
@@ -190,6 +194,10 @@ export function App() {
     engineRef.current?.setGraphicQuality(quality);
   }, []);
 
+  const handleSetMasterVolume = useCallback((vol: number) => {
+    engineRef.current?.setMasterVolume(vol);
+  }, []);
+
   const handleRerollPelican = useCallback(() => {
     coastalAudio.unlock();
     engineRef.current?.restart(true);
@@ -236,6 +244,7 @@ export function App() {
           onCycleCamera={handleCycleCamera}
           onSetGraphicQuality={handleSetGraphicQuality}
           onOpenTrophyRoom={handleOpenTrophyRoom}
+          onSetMasterVolume={handleSetMasterVolume}
         />
       )}
 

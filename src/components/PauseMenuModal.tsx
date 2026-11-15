@@ -21,6 +21,7 @@ interface PauseMenuModalProps {
   onCycleCamera: () => void;
   onSetGraphicQuality: (quality: GraphicQuality) => void;
   onOpenTrophyRoom: () => void;
+  onSetMasterVolume: (vol: number) => void;
 }
 
 export function PauseMenuModal({
@@ -31,6 +32,7 @@ export function PauseMenuModal({
   onCycleCamera,
   onSetGraphicQuality,
   onOpenTrophyRoom,
+  onSetMasterVolume,
 }: PauseMenuModalProps) {
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
 
@@ -98,7 +100,7 @@ export function PauseMenuModal({
           >
             <div className="text-[10px] text-amber-300 font-medium">已解锁成就 ❯</div>
             <div className="text-sm sm:text-base font-bold text-amber-300 font-mono mt-0.5">
-              {hud.totalAchievementsUnlocked} / 10
+              {hud.totalAchievementsUnlocked} / 11
             </div>
           </button>
         </div>
@@ -194,6 +196,28 @@ export function PauseMenuModal({
               )}
             </button>
           </div>
+
+          {/* Master Volume Slider */}
+          <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-slate-200">
+              <span className="flex items-center gap-2 font-medium">
+                <Volume2 className="w-4 h-4 text-sky-300" />
+                主音量调节
+              </span>
+              <span className="font-mono text-[11px] text-sky-300 font-semibold">
+                {hud.isMuted ? '已静音' : `${Math.round(hud.masterVolume * 100)}%`}
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={hud.isMuted ? 0 : hud.masterVolume}
+              onChange={(e) => onSetMasterVolume(parseFloat(e.target.value))}
+              className="w-full accent-sky-400 h-1.5 bg-white/20 rounded-lg cursor-pointer"
+            />
+          </div>
         </div>
 
         {/* Primary Action Buttons */}
@@ -231,7 +255,7 @@ export function PauseMenuModal({
         {/* Keyboard Tips */}
         <div className="mt-4 pt-3 border-t border-white/10 text-center text-[10px] text-slate-400 space-y-0.5">
           <div>快捷键：[ESC] 暂停/继续 · [空格] 车铃叮当 · [C] 切换视角</div>
-          <div>[↑ / W] 破风加速 · [↓ / S] 倒踩刹车 · [← / →] 左右变道</div>
+          <div>[↑ / W] 破风加速 · [↓ / S + 方向键] 压弯漂移蓄力喷射 · [← / →] 左右变道</div>
         </div>
       </div>
     </div>

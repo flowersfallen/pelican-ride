@@ -1567,3 +1567,87 @@ export function createRainSystem(): {
 
   return { lineSegments, positions, count };
 }
+
+export interface WindTurbineRig {
+  group: THREE.Group;
+  rotorGroup: THREE.Group;
+  beaconMesh: THREE.Mesh;
+  rotorSpeed: number;
+  baseZ: number;
+  baseX: number;
+}
+
+export function createWindTurbineMesh(): WindTurbineRig {
+  const group = new THREE.Group();
+  const whiteMat = new THREE.MeshStandardMaterial({
+    color: 0xf1f5f9,
+    roughness: 0.3,
+    metalness: 0.15,
+    flatShading: true,
+  });
+  const yellowMat = new THREE.MeshStandardMaterial({
+    color: 0xfacc15,
+    roughness: 0.5,
+    flatShading: true,
+  });
+  const beaconMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+
+  // Foundation platform above water level
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.8, 2.2, 12), yellowMat);
+  base.position.y = 1.0;
+  group.add(base);
+
+  // Main white tower
+  const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.88, 24, 12), whiteMat);
+  tower.position.y = 13.0;
+  tower.castShadow = true;
+  group.add(tower);
+
+  // Nacelle housing
+  const nacelle = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.9, 2.4), whiteMat);
+  nacelle.position.set(0, 25.2, 0);
+  group.add(nacelle);
+
+  // Top flashing red beacon light
+  const beaconMesh = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 6), beaconMat);
+  beaconMesh.position.set(0, 25.85, -0.4);
+  group.add(beaconMesh);
+
+  // Rotor Group (Hub + 3 blades)
+  const rotorGroup = new THREE.Group();
+  rotorGroup.position.set(0, 25.2, 1.25);
+
+  const hub = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.75, 8), whiteMat);
+  hub.rotation.x = Math.PI / 2;
+  rotorGroup.add(hub);
+
+  // 3 aerodynamic blades spaced at 120°
+  for (let i = 0; i < 3; i++) {
+    const bladeGroup = new THREE.Group();
+    bladeGroup.rotation.z = (i * Math.PI * 2) / 3;
+
+    // Aerodynamic blade tapering out to tip
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.24, 8.8, 0.05), whiteMat);
+    blade.position.y = 4.4;
+    // Red tip marking
+    const tip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.25, 1.5, 0.06),
+      new THREE.MeshBasicMaterial({ color: 0xef4444 }),
+    );
+    tip.position.y = 8.05;
+
+    bladeGroup.add(blade, tip);
+    rotorGroup.add(bladeGroup);
+  }
+
+  group.add(rotorGroup);
+
+  return {
+    group,
+    rotorGroup,
+    beaconMesh,
+    rotorSpeed: 0.45 + Math.random() * 0.25,
+    baseZ: 0,
+    baseX: -45 - Math.random() * 20,
+  };
+}
