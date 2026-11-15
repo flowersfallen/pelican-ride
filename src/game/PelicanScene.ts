@@ -197,6 +197,12 @@ export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
     desc: '在海浪与海风的伴奏下，聆听专属海滨 Lo-Fi 纯音乐旋律！',
     icon: '🎵',
   },
+  seagull_escort: {
+    id: 'seagull_escort',
+    title: '伴飞海鸥',
+    desc: '极速破风飞驰时，唤来海鸥群在车身两侧贴地伴飞！',
+    icon: '🕊️',
+  },
 };
 
 export class PelicanScene {
@@ -248,6 +254,8 @@ export class PelicanScene {
   private cameraMode: 'action' | 'chill' | 'drone' = 'action';
   private lastWhooshTime = 0;
   private lastRatchetTime = 0;
+  private seagullEscortTimer = 0;
+  private lastSeagullSoundTime = 0;
 
   // Game simulation state
   private playerX = 1.6;
@@ -2454,14 +2462,37 @@ export class PelicanScene {
       }
     }
 
-    // Coastal seagulls flight dynamics & storm evacuation
+    // Coastal seagulls flight dynamics & storm evacuation / escort formation
+    const wantsEscort =
+      (this.speed > 13.5 || this.boostTimer > 0 || this.isFeverMode) && !isThreat;
+
     for (let i = 0; i < this.seagulls.length; i++) {
       const gull = this.seagulls[i];
       gull.flapPhase += gull.flapSpeed * dt;
       gull.leftWing.rotation.z = 0.12 + Math.sin(gull.flapPhase) * 0.38;
       gull.rightWing.rotation.z = -0.12 - Math.sin(gull.flapPhase) * 0.38;
 
-      if (isThreat) {
+      if (wantsEscort && (i === 0 || i === 1)) {
+        // Dynamic flanking escort: one gull on left, one on right alongside pelican
+        const targetX = this.playerX + (i === 0 ? -1.8 : 1.8);
+        const targetY = 1.45 + Math.sin(elapsedSec * 3.5 + i) * 0.22;
+        const targetZ = this.playerZ - 0.5 + Math.cos(elapsedSec * 2.8 + i) * 0.25;
+
+        gull.group.position.x += (targetX - gull.group.position.x) * Math.min(1, dt * 3.5);
+        gull.group.position.y += (targetY - gull.group.position.y) * Math.min(1, dt * 3.5);
+        gull.group.position.z += (targetZ - gull.group.position.z) * Math.min(1, dt * 4.5);
+        gull.group.rotation.y = 0;
+        gull.group.rotation.z = i === 0 ? -0.18 : 0.18;
+
+        this.seagullEscortTimer += dt * 0.5;
+        if (this.seagullEscortTimer > 2.0) {
+          if (elapsedSec - this.lastSeagullSoundTime > 4.5) {
+            this.lastSeagullSoundTime = elapsedSec;
+            coastalAudio.playSeagullSquawk();
+          }
+          this.checkAchievement('seagull_escort');
+        }
+      } else if (isThreat) {
         // Fleeing inland toward the beach (+X) and speeding ahead
         gull.group.position.x += 4.5 * dt;
         gull.group.position.z -= (this.speed + 8.5) * dt;
@@ -2473,11 +2504,13 @@ export class PelicanScene {
         gull.group.rotation.y = Math.sin(elapsedSec * 0.6 + i) * 0.15;
       }
 
-      if (gull.group.position.z > this.playerZ + 25) {
-        gull.group.position.z = this.playerZ - 130 - Math.random() * 35;
-        gull.group.position.x = -12 + Math.random() * 18;
-      } else if (gull.group.position.z < this.playerZ - 170) {
-        gull.group.position.z = this.playerZ - 25;
+      if (!wantsEscort || (i !== 0 && i !== 1)) {
+        if (gull.group.position.z > this.playerZ + 25) {
+          gull.group.position.z = this.playerZ - 130 - Math.random() * 35;
+          gull.group.position.x = -12 + Math.random() * 18;
+        } else if (gull.group.position.z < this.playerZ - 170) {
+          gull.group.position.z = this.playerZ - 25;
+        }
       }
     }
 
@@ -2701,11 +2734,16 @@ export class PelicanScene {
 
   private emitHud(): void {
     const tier = getTierForLevel(this.level);
+    const speedKmh = Math.round(this.speed * 3.2);
+    const gear =
+      speedKmh <= 0 ? 0 : speedKmh < 24 ? 1 : speedKmh < 42 ? 2 : speedKmh < 58 ? 3 : speedKmh < 75 ? 4 : 5;
+    const tachometerPct = Math.min(100, Math.round((speedKmh / 88) * 100));
+
     this.onHudUpdate({
       pelican: this.identity,
       distanceMeters: Math.max(0, Math.round(-this.playerZ)),
       bestDistanceMeters: this.bestDistance,
-      speedKmh: Math.round(this.speed * 3.2),
+      speedKmh,
       level: this.level,
       tierName: tier.name,
       xp: this.xp,
@@ -2745,6 +2783,8 @@ export class PelicanScene {
       isFeverMode: this.isFeverMode,
       isPhotoMode: this.isPhotoMode,
       bgmVolume: coastalAudio.getBgmVolume(),
+      gear,
+      tachometerPct,
     });
   }
 

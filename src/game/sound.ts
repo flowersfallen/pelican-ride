@@ -1085,6 +1085,44 @@ class CoastalAudioEngine {
       // Audio fallback
     }
   }
+
+  public playSeagullSquawk(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      [0, 0.18].forEach((delay, idx) => {
+        const osc = this.ctx!.createOscillator();
+        const gain = this.ctx!.createGain();
+        const filter = this.ctx!.createBiquadFilter();
+
+        osc.type = 'sawtooth';
+        const startFreq = idx === 0 ? 2100 : 2350;
+        const endFreq = idx === 0 ? 1500 : 1650;
+        osc.frequency.setValueAtTime(startFreq, now + delay);
+        osc.frequency.exponentialRampToValueAtTime(endFreq, now + delay + 0.14);
+
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1800, now + delay);
+        filter.Q.setValueAtTime(3.5, now + delay);
+
+        gain.gain.setValueAtTime(0.001, now + delay);
+        gain.gain.linearRampToValueAtTime(0.045, now + delay + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.15);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.getDestination());
+
+        osc.start(now + delay);
+        osc.stop(now + delay + 0.16);
+      });
+    } catch {
+      // Audio fallback
+    }
+  }
 }
 
 export const coastalAudio = new CoastalAudioEngine();
