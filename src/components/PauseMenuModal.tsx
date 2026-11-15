@@ -2,6 +2,7 @@ import {
   Camera,
   Maximize2,
   Minimize2,
+  Music,
   Palette,
   Play,
   RotateCcw,
@@ -25,6 +26,7 @@ interface PauseMenuModalProps {
   onOpenWardrobe?: () => void;
   onTogglePhotoMode?: () => void;
   onSetMasterVolume: (vol: number) => void;
+  onSetBgmVolume?: (vol: number) => void;
 }
 
 export function PauseMenuModal({
@@ -38,6 +40,7 @@ export function PauseMenuModal({
   onOpenWardrobe,
   onTogglePhotoMode,
   onSetMasterVolume,
+  onSetBgmVolume,
 }: PauseMenuModalProps) {
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
 
@@ -105,7 +108,7 @@ export function PauseMenuModal({
           >
             <div className="text-[10px] text-amber-300 font-medium">已解锁成就 ❯</div>
             <div className="text-sm sm:text-base font-bold text-amber-300 font-mono mt-0.5">
-              {hud.totalAchievementsUnlocked} / 17
+              {hud.totalAchievementsUnlocked} / 19
             </div>
           </button>
         </div>
@@ -221,6 +224,28 @@ export function PauseMenuModal({
               value={hud.isMuted ? 0 : hud.masterVolume}
               onChange={(e) => onSetMasterVolume(parseFloat(e.target.value))}
               className="w-full accent-sky-400 h-1.5 bg-white/20 rounded-lg cursor-pointer"
+            />
+          </div>
+
+          {/* Coastal Seaside BGM Music Slider */}
+          <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-slate-200">
+              <span className="flex items-center gap-2 font-medium">
+                <Music className="w-4 h-4 text-amber-300" />
+                海滨纯音 BGM 音量
+              </span>
+              <span className="font-mono text-[11px] text-amber-300 font-semibold">
+                {hud.isMuted ? '已静音' : `${Math.round(hud.bgmVolume * 100)}%`}
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={hud.isMuted ? 0 : hud.bgmVolume}
+              onChange={(e) => onSetBgmVolume?.(parseFloat(e.target.value))}
+              className="w-full accent-amber-400 h-1.5 bg-white/20 rounded-lg cursor-pointer"
             />
           </div>
         </div>

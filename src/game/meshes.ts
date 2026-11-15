@@ -1119,27 +1119,53 @@ export interface SeagullRig {
   flapPhase: number;
 }
 
-export function createCloudMesh(): THREE.Group {
+export interface CloudRig {
+  group: THREE.Group;
+  mat: THREE.MeshStandardMaterial;
+  speed: number;
+  baseY: number;
+  baseX: number;
+  baseZ: number;
+  wobbleOffset: number;
+}
+
+export function createCloudMesh(): CloudRig {
   const group = new THREE.Group();
-  const cloudMat = new THREE.MeshStandardMaterial({
+  const mat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
-    roughness: 0.85,
+    roughness: 0.95,
     flatShading: true,
+    transparent: true,
+    opacity: 0.92,
   });
 
-  const puffCount = 4 + Math.floor(Math.random() * 3);
-  for (let i = 0; i < puffCount; i++) {
-    const r = 2.4 + Math.random() * 2.6;
-    const geo = new THREE.DodecahedronGeometry(r, 1);
-    const puff = new THREE.Mesh(geo, cloudMat);
-    puff.position.set(
-      (i - puffCount / 2) * 3.2 + (Math.random() - 0.5) * 1.5,
-      (Math.random() - 0.5) * 1.2,
-      (Math.random() - 0.5) * 2.0,
-    );
+  const puffDefs = [
+    { x: 0, y: 0, z: 0, r: 2.2 },
+    { x: 1.8, y: -0.2, z: 0.3, r: 1.6 },
+    { x: -1.7, y: -0.3, z: -0.2, r: 1.7 },
+    { x: 0.8, y: 0.9, z: -0.4, r: 1.5 },
+    { x: -0.7, y: 0.7, z: 0.4, r: 1.4 },
+    { x: 2.9, y: -0.6, z: 0.1, r: 1.1 },
+    { x: -2.8, y: -0.6, z: -0.1, r: 1.1 },
+  ];
+
+  for (const def of puffDefs) {
+    const geo = new THREE.DodecahedronGeometry(def.r, 1);
+    const puff = new THREE.Mesh(geo, mat);
+    puff.position.set(def.x, def.y, def.z);
+    puff.scale.set(1.2, 0.75, 1.0);
     group.add(puff);
   }
-  return group;
+
+  return {
+    group,
+    mat,
+    speed: 1.8 + Math.random() * 1.5,
+    baseY: 18 + Math.random() * 8,
+    baseX: (Math.random() - 0.5) * 80,
+    baseZ: 0,
+    wobbleOffset: Math.random() * Math.PI * 2,
+  };
 }
 
 export function createSeagullMesh(): SeagullRig {
@@ -1726,5 +1752,123 @@ export function createWindTurbineMesh(): WindTurbineRig {
     rotorSpeed: 0.45 + Math.random() * 0.25,
     baseZ: 0,
     baseX: -45 - Math.random() * 20,
+  };
+}
+
+export interface TurtleRig {
+  group: THREE.Group;
+  head: THREE.Mesh;
+  frontLeftFlipper: THREE.Group;
+  frontRightFlipper: THREE.Group;
+  backLeftFlipper: THREE.Group;
+  backRightFlipper: THREE.Group;
+  baseX: number;
+  baseZ: number;
+  crawlSpeed: number;
+  isStartled: boolean;
+  startleTimer: number;
+}
+
+export function createSeaTurtleMesh(): TurtleRig {
+  const group = new THREE.Group();
+
+  const shellMat = new THREE.MeshStandardMaterial({
+    color: 0x4d7c0f,
+    roughness: 0.6,
+    flatShading: true,
+  });
+  const shellRimMat = new THREE.MeshStandardMaterial({
+    color: 0x65a30d,
+    roughness: 0.5,
+    flatShading: true,
+  });
+  const skinMat = new THREE.MeshStandardMaterial({
+    color: 0x84cc16,
+    roughness: 0.8,
+    flatShading: true,
+  });
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+
+  // Domed Low-poly Carapace Shell
+  const shellGeo = new THREE.SphereGeometry(0.55, 7, 5, 0, Math.PI * 2, 0, Math.PI * 0.5);
+  const shell = new THREE.Mesh(shellGeo, shellMat);
+  shell.scale.set(1.0, 0.55, 1.25);
+  shell.position.y = 0.12;
+
+  // Carapace Rim Edge
+  const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.05, 8), shellRimMat);
+  rim.scale.set(1.0, 1.0, 1.25);
+  rim.position.y = 0.12;
+
+  // Plastron (Belly Shell)
+  const bellyMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.8, flatShading: true });
+  const belly = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.06, 1.1), bellyMat);
+  belly.position.y = 0.09;
+
+  group.add(shell, rim, belly);
+
+  // Head with beady eyes
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.16, 0.28), skinMat);
+  head.position.set(0, 0.18, -0.75);
+
+  const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 4, 4), eyeMat);
+  leftEye.position.set(-0.12, 0.03, -0.06);
+  const rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 4, 4), eyeMat);
+  rightEye.position.set(0.12, 0.03, -0.06);
+  head.add(leftEye, rightEye);
+  group.add(head);
+
+  // Front Flippers (Long, wing-like paddle flippers)
+  const flipperGeo = new THREE.BoxGeometry(0.45, 0.04, 0.2);
+
+  const frontLeftFlipper = new THREE.Group();
+  frontLeftFlipper.position.set(-0.45, 0.12, -0.35);
+  const flMesh = new THREE.Mesh(flipperGeo, skinMat);
+  flMesh.position.x = -0.2;
+  flMesh.rotation.y = 0.35;
+  frontLeftFlipper.add(flMesh);
+
+  const frontRightFlipper = new THREE.Group();
+  frontRightFlipper.position.set(0.45, 0.12, -0.35);
+  const frMesh = new THREE.Mesh(flipperGeo, skinMat);
+  frMesh.position.x = 0.2;
+  frMesh.rotation.y = -0.35;
+  frontRightFlipper.add(frMesh);
+
+  // Back Flippers
+  const backFlipperGeo = new THREE.BoxGeometry(0.25, 0.04, 0.16);
+
+  const backLeftFlipper = new THREE.Group();
+  backLeftFlipper.position.set(-0.35, 0.1, 0.45);
+  const blMesh = new THREE.Mesh(backFlipperGeo, skinMat);
+  blMesh.position.x = -0.12;
+  backLeftFlipper.add(blMesh);
+
+  const backRightFlipper = new THREE.Group();
+  backRightFlipper.position.set(0.35, 0.1, 0.45);
+  const brMesh = new THREE.Mesh(backFlipperGeo, skinMat);
+  brMesh.position.x = 0.12;
+  backRightFlipper.add(brMesh);
+
+  // Little tail
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.18, 4), skinMat);
+  tail.rotation.x = -Math.PI / 2;
+  tail.position.set(0, 0.1, 0.72);
+  group.add(tail);
+
+  group.add(frontLeftFlipper, frontRightFlipper, backLeftFlipper, backRightFlipper);
+
+  return {
+    group,
+    head,
+    frontLeftFlipper,
+    frontRightFlipper,
+    backLeftFlipper,
+    backRightFlipper,
+    baseX: -3.2,
+    baseZ: -50,
+    crawlSpeed: 0.18 + Math.random() * 0.15,
+    isStartled: false,
+    startleTimer: 0,
   };
 }

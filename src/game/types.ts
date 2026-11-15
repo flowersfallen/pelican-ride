@@ -23,7 +23,9 @@ export type AchievementId =
   | 'aerial_acrobat'
   | 'coastal_photographer'
   | 'slipstream_master'
-  | 'dolphin_companion';
+  | 'dolphin_companion'
+  | 'coastal_turtle'
+  | 'coastal_melody';
 
 export type GraphicQuality = 'high' | 'battery_saver';
 
@@ -122,4 +124,5 @@ export interface GameHudState {
   gradientPct: number;
   isFeverMode: boolean;
   isPhotoMode: boolean;
+  bgmVolume: number;
 }
