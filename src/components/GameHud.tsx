@@ -127,6 +127,38 @@ export function GameHud({
               <span title="海草（抗浪护盾）">🌿 {hud.pickups.seaweed}</span>
               <span title="探照车灯（强光夜巡）">💡 {hud.pickups.lantern}</span>
             </div>
+
+            {/* Athletic Cycling Telemetry Strip */}
+            <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between gap-1.5 text-[10px] font-mono text-slate-300">
+              <span className="flex items-center gap-1" title="实时脚踏踏频 (RPM)">
+                <span className="text-amber-400">⚡</span>
+                <span className={hud.cadenceRpm > 0 ? 'text-sky-300 font-semibold' : 'text-slate-400'}>
+                  {hud.cadenceRpm} <span className="text-[9px] text-slate-400">RPM</span>
+                </span>
+              </span>
+
+              <span
+                className={`flex items-center gap-1 ${
+                  hud.heartRateBpm > 165 ? 'text-rose-400 font-bold animate-pulse' : 'text-slate-200'
+                }`}
+                title="骑手动态心率 (BPM)"
+              >
+                <span>❤️</span>
+                <span>{hud.heartRateBpm} <span className="text-[9px] text-slate-400 font-normal">BPM</span></span>
+              </span>
+
+              <span className="flex items-center gap-1" title="累计能量消耗 (kcal)">
+                <span className="text-orange-400">🔥</span>
+                <span>{hud.caloriesKcal} <span className="text-[9px] text-slate-400">kcal</span></span>
+              </span>
+
+              <span className="flex items-center gap-1" title="道路起伏坡度 (%)">
+                <span className="text-emerald-400">📐</span>
+                <span className={hud.gradientPct >= 0 ? 'text-emerald-300' : 'text-sky-300'}>
+                  {hud.gradientPct > 0 ? `+${hud.gradientPct}` : hud.gradientPct}%
+                </span>
+              </span>
+            </div>
           </div>
 
           {/* Right: Quick Controls & Link Back to Timeline */}
@@ -347,6 +379,12 @@ export function GameHud({
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/85 text-white px-2.5 py-0.5 text-[11px] font-bold shadow">
                   <Shield className="w-3 h-3" />
                   海草护盾 {hud.shieldRemainingSec}s
+                </span>
+              )}
+              {hud.isJumpingAir && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 px-2.5 py-0.5 text-[11px] font-extrabold shadow animate-bounce">
+                  <span>🦅</span>
+                  <span>凌空飞跃！按【空格】施展 360° 特技回旋</span>
                 </span>
               )}
               {hud.inShallowWater && hud.shieldRemainingSec <= 0 && (

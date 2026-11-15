@@ -1,4 +1,4 @@
-export type HatStyle = 'cap' | 'straw' | 'visor' | 'crown';
+export type HatStyle = 'cap' | 'straw' | 'visor' | 'crown' | 'captain' | 'flowers';
 
 export type CollectibleType = 'fish' | 'shrimp' | 'starfish' | 'seaweed' | 'lantern';
 
@@ -17,7 +17,10 @@ export type AchievementId =
   | 'crab_whisperer'
   | 'lantern_keeper'
   | 'traffic_slalom'
-  | 'drift_master';
+  | 'drift_master'
+  | 'lighthouse_beacon'
+  | 'custom_garage'
+  | 'aerial_acrobat';
 
 export type GraphicQuality = 'high' | 'battery_saver';
 
@@ -110,4 +113,8 @@ export interface GameHudState {
   driftChargeLevel: number;
   masterVolume: number;
   lifetimeStats: LifetimeStats;
+  cadenceRpm: number;
+  heartRateBpm: number;
+  caloriesKcal: number;
+  gradientPct: number;
 }

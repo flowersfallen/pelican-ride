@@ -2,6 +2,7 @@ import {
   Camera,
   Maximize2,
   Minimize2,
+  Palette,
   Play,
   RotateCcw,
   Sparkles,
@@ -21,6 +22,7 @@ interface PauseMenuModalProps {
   onCycleCamera: () => void;
   onSetGraphicQuality: (quality: GraphicQuality) => void;
   onOpenTrophyRoom: () => void;
+  onOpenWardrobe?: () => void;
   onSetMasterVolume: (vol: number) => void;
 }
 
@@ -32,6 +34,7 @@ export function PauseMenuModal({
   onCycleCamera,
   onSetGraphicQuality,
   onOpenTrophyRoom,
+  onOpenWardrobe,
   onSetMasterVolume,
 }: PauseMenuModalProps) {
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
@@ -234,22 +237,31 @@ export function PauseMenuModal({
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
+              onClick={onOpenWardrobe}
+              className="py-2.5 px-3 rounded-2xl bg-pink-500/15 hover:bg-pink-500/25 text-pink-200 font-semibold text-xs border border-pink-400/30 flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <Palette className="w-3.5 h-3.5 text-pink-400" />
+              <span>涂装更衣室</span>
+            </button>
+
+            <button
+              type="button"
               onClick={onOpenTrophyRoom}
               className="py-2.5 px-3 rounded-2xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 font-semibold text-xs border border-amber-400/30 flex items-center justify-center gap-1.5 transition-colors"
             >
               <Trophy className="w-3.5 h-3.5 text-amber-400" />
               <span>荣誉陈列馆</span>
             </button>
-
-            <button
-              type="button"
-              onClick={onRestart}
-              className="py-2.5 px-3 rounded-2xl bg-white/10 hover:bg-white/15 text-slate-200 font-semibold text-xs border border-white/15 flex items-center justify-center gap-1.5 transition-colors"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>重新开始</span>
-            </button>
           </div>
+
+          <button
+            type="button"
+            onClick={onRestart}
+            className="w-full py-2.5 px-3 rounded-2xl bg-white/10 hover:bg-white/15 text-slate-200 font-semibold text-xs border border-white/15 flex items-center justify-center gap-1.5 transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>重新开始</span>
+          </button>
         </div>
 
         {/* Keyboard Tips */}

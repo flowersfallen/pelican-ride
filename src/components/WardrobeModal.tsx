@@ -9,10 +9,12 @@ interface WardrobeModalProps {
 }
 
 const HAT_OPTIONS: { id: HatStyle; name: string; icon: string }[] = [
-  { id: 'cap', name: '棒球帽', icon: '🧢' },
-  { id: 'straw', name: '草帽', icon: '👒' },
-  { id: 'visor', name: '遮阳帽', icon: '🕶️' },
+  { id: 'cap', name: '公路头盔', icon: '🧢' },
+  { id: 'straw', name: '海滨草帽', icon: '👒' },
+  { id: 'visor', name: '破风风镜', icon: '🕶️' },
   { id: 'crown', name: '闪耀皇冠', icon: '👑' },
+  { id: 'captain', name: '水手长帽', icon: '⚓' },
+  { id: 'flowers', name: '夏威夷花环', icon: '🌺' },
 ];
 
 const HAT_COLORS = [
@@ -34,12 +36,14 @@ const SCARF_COLORS = [
 ];
 
 const FRAME_COLORS = [
-  { label: '薄荷绿', hex: '#10b981' },
-  { label: '暮光橙', hex: '#f97316' },
-  { label: '苍穹蓝', hex: '#0ea5e9' },
-  { label: '樱花粉', hex: '#fb7185' },
-  { label: '黑曜石', hex: '#1e293b' },
-  { label: '活力紫', hex: '#8b5cf6' },
+  { label: '苍穹海蓝', hex: '#0ea5e9' },
+  { label: '暮光暖橙', hex: '#f97316' },
+  { label: '疾速薄荷', hex: '#10b981' },
+  { label: '环法领骑黄', hex: '#eab308' },
+  { label: '赛博魅紫', hex: '#8b5cf6' },
+  { label: '极地珍珠白', hex: '#f8fafc' },
+  { label: '黑曜石金', hex: '#1e293b' },
+  { label: '樱花珊瑚粉', hex: '#fb7185' },
 ];
 
 export function WardrobeModal({

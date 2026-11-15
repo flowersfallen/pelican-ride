@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CollectibleType, PelicanIdentity } from './types';
+import { CollectibleType, HatStyle, PelicanIdentity } from './types';
 
 export interface PelicanRig {
   group: THREE.Group;
@@ -19,6 +19,9 @@ export interface PelicanRig {
   headlightMesh?: THREE.Mesh;
   headlightBeam?: THREE.Mesh;
   taillightMesh?: THREE.Mesh;
+  hatGroup?: THREE.Group;
+  bikeComputer?: THREE.Group;
+  updateCustomization?: (patch: Partial<PelicanIdentity>) => void;
 }
 
 function makeTubeBetween(
@@ -119,11 +122,6 @@ export function createPelicanRiderMesh(
     roughness: 0.65,
     flatShading: true,
   });
-  const hatMat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(identity.hatColor),
-    roughness: 0.6,
-    flatShading: true,
-  });
   const scarfMat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(identity.scarfColor),
     roughness: 0.7,
@@ -213,6 +211,23 @@ export function createPelicanRiderMesh(
     grip.position.set(gx, 0.24, 0.04);
     handlebarGroup.add(grip);
   });
+
+  // Miniature GPS cycling computer mounted on handlebar stem
+  const computerGroup = new THREE.Group();
+  computerGroup.position.set(0, 0.26, 0.02);
+  const compCase = new THREE.Mesh(
+    new THREE.BoxGeometry(0.1, 0.03, 0.075),
+    new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.35, flatShading: true }),
+  );
+  computerGroup.add(compCase);
+  const compScreen = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.082, 0.058),
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8 }),
+  );
+  compScreen.rotation.x = -Math.PI / 2.5;
+  compScreen.position.set(0, 0.018, 0);
+  computerGroup.add(compScreen);
+  handlebarGroup.add(computerGroup);
 
   // Wicker front basket with a cute fish peeking out
   const basketMat = new THREE.MeshStandardMaterial({
@@ -362,33 +377,92 @@ export function createPelicanRiderMesh(
   beakLower.castShadow = true;
   headGroup.add(beakLower);
 
-  // Hat Variants
-  if (identity.hat === 'cap') {
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.19, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), hatMat);
-    dome.position.set(0, 0.1, 0);
-    const brim = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.03, 0.2), hatMat);
-    brim.position.set(0, 0.11, -0.18);
-    headGroup.add(dome, brim);
-  } else if (identity.hat === 'straw') {
-    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.38, 0.04, 12), hatMat);
-    brim.position.set(0, 0.15, 0);
-    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.19, 0.15, 10), hatMat);
-    crown.position.set(0, 0.22, 0);
-    headGroup.add(brim, crown);
-  } else if (identity.hat === 'visor') {
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.195, 0.195, 0.08, 10), hatMat);
-    band.position.set(0, 0.09, -0.02);
-    const shield = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.08, 0.1), darkMat);
-    shield.position.set(0, 0.05, -0.19);
-    headGroup.add(band, shield);
-  } else {
-    const crown = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.16, 0.12, 0.14, 6),
-      new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.3, metalness: 0.6, flatShading: true }),
-    );
-    crown.position.set(0, 0.22, 0);
-    headGroup.add(crown);
-  }
+  // Hat & Accessories Group
+  const hatGroup = new THREE.Group();
+  headGroup.add(hatGroup);
+
+  const populateHat = (hatStyle: HatStyle, colorHex: string) => {
+    while (hatGroup.children.length > 0) {
+      hatGroup.remove(hatGroup.children[0]);
+    }
+    const mat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(colorHex),
+      roughness: 0.6,
+      flatShading: true,
+    });
+    const goldMat = new THREE.MeshStandardMaterial({
+      color: 0xfacc15,
+      roughness: 0.25,
+      metalness: 0.7,
+      flatShading: true,
+    });
+
+    if (hatStyle === 'cap') {
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(0.19, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), mat);
+      dome.position.set(0, 0.1, 0);
+      const brim = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.03, 0.2), mat);
+      brim.position.set(0, 0.11, -0.18);
+      hatGroup.add(dome, brim);
+    } else if (hatStyle === 'straw') {
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.38, 0.04, 12), mat);
+      brim.position.set(0, 0.15, 0);
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.19, 0.15, 10), mat);
+      crown.position.set(0, 0.22, 0);
+      hatGroup.add(brim, crown);
+    } else if (hatStyle === 'visor') {
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.195, 0.195, 0.08, 10), mat);
+      band.position.set(0, 0.09, -0.02);
+      const shield = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.08, 0.1), darkMat);
+      shield.position.set(0, 0.05, -0.19);
+      hatGroup.add(band, shield);
+    } else if (hatStyle === 'crown') {
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.12, 0.14, 6), goldMat);
+      crown.position.set(0, 0.22, 0);
+      hatGroup.add(crown);
+    } else if (hatStyle === 'captain') {
+      // Captain peaked officer cap
+      const capCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.2, 0.12, 12), mat);
+      capCrown.position.set(0, 0.16, 0);
+      const capVisor = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.03, 0.16), darkMat);
+      capVisor.position.set(0, 0.1, -0.17);
+      capVisor.rotation.x = 0.12;
+      const goldBadge = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), goldMat);
+      goldBadge.position.set(0, 0.18, -0.2);
+      hatGroup.add(capCrown, capVisor, goldBadge);
+    } else if (hatStyle === 'flowers') {
+      // Hawaiian Tropical Floral Lei Wreath
+      const wreathColors = [0xef4444, 0xfacc15, 0xec4899, 0x38bdf8, 0x10b981];
+      for (let i = 0; i < 7; i++) {
+        const flowerAngle = (i / 7) * Math.PI * 2;
+        const fl = new THREE.Mesh(
+          new THREE.SphereGeometry(0.048, 5, 5),
+          new THREE.MeshStandardMaterial({
+            color: wreathColors[i % wreathColors.length],
+            roughness: 0.5,
+            flatShading: true,
+          }),
+        );
+        fl.position.set(Math.sin(flowerAngle) * 0.19, 0.12, Math.cos(flowerAngle) * 0.19);
+        hatGroup.add(fl);
+      }
+    }
+  };
+
+  populateHat(identity.hat, identity.hatColor);
+
+  const updateCustomization = (patch: Partial<PelicanIdentity>) => {
+    if (patch.frameColor) {
+      frameMat.color.set(patch.frameColor);
+    }
+    if (patch.scarfColor) {
+      scarfMat.color.set(patch.scarfColor);
+    }
+    if (patch.hat || patch.hatColor) {
+      const targetHat = patch.hat || identity.hat;
+      const targetColor = patch.hatColor || identity.hatColor;
+      populateHat(targetHat, targetColor);
+    }
+  };
 
   // Scarf collar + fluttering tail
   const collar = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.05, 6, 12), scarfMat);
@@ -434,6 +508,9 @@ export function createPelicanRiderMesh(
     headlightMesh,
     headlightBeam,
     taillightMesh,
+    hatGroup,
+    bikeComputer: computerGroup,
+    updateCustomization,
   };
 }
 

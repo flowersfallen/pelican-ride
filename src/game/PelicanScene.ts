@@ -146,6 +146,24 @@ export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
     desc: '弯道减速甩尾漂移，释放迷你涡轮喷射！',
     icon: '⚡',
   },
+  lighthouse_beacon: {
+    id: 'lighthouse_beacon',
+    title: '海角守望',
+    desc: '掠过雄伟的海角红白守望灯塔，聆听悠扬海雾汽笛！',
+    icon: '🗼',
+  },
+  custom_garage: {
+    id: 'custom_garage',
+    title: '涂装大师',
+    desc: '在车队更衣室定制爱车涂装与个性帽子！',
+    icon: '🎨',
+  },
+  aerial_acrobat: {
+    id: 'aerial_acrobat',
+    title: '特技大师',
+    desc: '冲上跳台腾空飞跃时施展 360° 凌空特技回旋！',
+    icon: '💫',
+  },
 };
 
 export class PelicanScene {
@@ -220,6 +238,19 @@ export class PelicanScene {
   // Aerial Stunt Jump & State
   private isJumpingAir = false;
   private airJumpTimer = 0;
+  private hasDoneAirTrick = false;
+  private airStuntActive = false;
+  private barrelRollProgress = 0;
+
+  // Athletic Telemetry & Bio-Rhythm Simulation
+  private cadenceRpm = 0;
+  private heartRateBpm = 115;
+  private caloriesKcal = 0;
+  private gradientPct = 0;
+  private heartbeatTimer = 0;
+  private lighthousePassed = false;
+  private roadMat!: THREE.MeshStandardMaterial;
+
   private isPaused = false;
   private graphicQuality: GraphicQuality = 'high';
   private lightningTimer = 0;
@@ -313,6 +344,14 @@ export class PelicanScene {
           totalJumps: Number(parsed.totalJumps) || 0,
           totalDriftTurbos: Number(parsed.totalDriftTurbos) || 0,
         };
+      }
+
+      const savedIdentity = localStorage.getItem('pelican_ride_saved_identity_v1');
+      if (savedIdentity) {
+        const parsedId = JSON.parse(savedIdentity);
+        if (parsedId && typeof parsedId === 'object') {
+          this.identity = { ...this.identity, ...parsedId };
+        }
       }
     } catch {
       // Ignore storage failures in private modes
@@ -434,7 +473,7 @@ export class PelicanScene {
     this.scene.add(this.shallowFloodMesh);
 
     // Recycled Coastal Boardwalk Segments
-    const roadMat = new THREE.MeshStandardMaterial({
+    this.roadMat = new THREE.MeshStandardMaterial({
       color: 0x475569,
       roughness: 0.88,
       flatShading: true,
@@ -462,7 +501,7 @@ export class PelicanScene {
       // Coastal asphalt/boardwalk surface (width 13.4m)
       const road = new THREE.Mesh(
         new THREE.BoxGeometry(ROAD_HALF_WIDTH * 2 + 1.0, 0.3, SEGMENT_LENGTH + 0.1),
-        roadMat,
+        this.roadMat,
       );
       road.position.set(0, -0.15, 0);
       road.receiveShadow = true;
@@ -774,6 +813,39 @@ export class PelicanScene {
   }
 
   public triggerBell(): void {
+    // If airborne, action key triggers 360-degree aerial barrel roll stunt!
+    if (this.isJumpingAir && !this.hasDoneAirTrick) {
+      this.hasDoneAirTrick = true;
+      this.airStuntActive = true;
+      this.barrelRollProgress = 0;
+      coastalAudio.playStuntSpin();
+      this.bannerText = '✨ 360° 凌空特技回旋！+300 风格分';
+      this.bannerTimer = 2.2;
+      this.xp += 1;
+      this.checkAchievement('aerial_acrobat');
+
+      // Mid-air golden sparkles
+      const starMat = new THREE.MeshBasicMaterial({ color: 0xfde047, transparent: true, opacity: 0.9 });
+      for (let k = 0; k < 12; k++) {
+        const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), starMat);
+        star.position.set(
+          this.playerX + (Math.random() - 0.5) * 1.2,
+          this.playerRig.group.position.y + 0.5 + (Math.random() - 0.5) * 0.8,
+          this.playerZ + (Math.random() - 0.5) * 1.2,
+        );
+        this.scene.add(star);
+        this.particles.push({
+          mesh: star,
+          vel: new THREE.Vector3((Math.random() - 0.5) * 4.2, 1.8 + Math.random() * 2.2, (Math.random() - 0.5) * 4.2),
+          life: 0.55,
+        });
+      }
+      try {
+        navigator.vibrate?.([40, 30, 60]);
+      } catch {}
+      return;
+    }
+
     coastalAudio.playBell();
     coastalAudio.playPelicanHonk();
     this.bellRingTimer = 0.65;
@@ -865,19 +937,35 @@ export class PelicanScene {
 
   public updatePelicanIdentity(patch: Partial<PelicanIdentity>): void {
     Object.assign(this.identity, patch);
-    this.spawnPlayer();
-    this.applyTierFrameTint();
+    if (this.playerRig?.updateCustomization) {
+      this.playerRig.updateCustomization(patch);
+    } else {
+      this.spawnPlayer();
+      this.applyTierFrameTint();
+    }
+    try {
+      localStorage.setItem('pelican_ride_saved_identity_v1', JSON.stringify(this.identity));
+    } catch {
+      // Ignore
+    }
+    this.checkAchievement('custom_garage');
     this.emitHud();
   }
 
   public restart(rerollPelican = false): void {
     if (rerollPelican) {
       this.identity = createRandomPelicanIdentity();
+      try {
+        localStorage.removeItem('pelican_ride_saved_identity_v1');
+      } catch {}
       this.spawnPlayer();
     }
     this.isPaused = false;
     this.isJumpingAir = false;
     this.airJumpTimer = 0;
+    this.airStuntActive = false;
+    this.hasDoneAirTrick = false;
+    this.barrelRollProgress = 0;
     this.isDrifting = false;
     this.driftTimer = 0;
     this.driftChargeLevel = 0;
@@ -1415,6 +1503,32 @@ export class PelicanScene {
       ROAD_HALF_WIDTH - 0.6,
     );
 
+    // Athletic Telemetry & Bio-Rhythm Simulation
+    const isPedaling =
+      (this.input.accelerate || this.boostTimer > 0 || this.miniTurboTimer > 0) && !this.input.brake;
+    this.cadenceRpm = this.speed > 0.5 && isPedaling ? Math.round(75 + (this.speed / 28.5) * 45) : 0;
+
+    let targetHR = 115;
+    if (this.input.accelerate || this.boostTimer > 0) targetHR += 42;
+    if (this.isDrifting) targetHR += 24;
+    const isThreatState = this.disasterPhase === 'warning' || this.disasterPhase === 'active';
+    if (isThreatState) {
+      const dangerFactor = Math.max(0, 1 - Math.min(25, this.waveGap) / 25);
+      targetHR += Math.round(dangerFactor * 38);
+    }
+    this.heartRateBpm += (targetHR - this.heartRateBpm) * Math.min(1, 1.8 * dt);
+
+    if (isThreatState && this.heartRateBpm > 168 && this.waveGap < 16) {
+      this.heartbeatTimer -= dt;
+      if (this.heartbeatTimer <= 0) {
+        this.heartbeatTimer = 0.62;
+        coastalAudio.playHeartbeat();
+      }
+    }
+
+    this.caloriesKcal += (this.speed * 0.0035 + (this.input.accelerate ? 0.003 : 0.0008)) * dt * 8;
+    this.gradientPct = Math.sin(this.playerZ * 0.026) * 2.6;
+
     const distanceMeters = Math.max(0, Math.round(-this.playerZ));
     if (distanceMeters > this.bestDistance) {
       this.bestDistance = distanceMeters;
@@ -1463,10 +1577,13 @@ export class PelicanScene {
         const dz = this.playerZ - ramp.position.z;
         if (Math.abs(dx) < 1.35 && Math.abs(dz) < 1.9) {
           this.isJumpingAir = true;
-          this.airJumpTimer = 0.92;
+          this.airJumpTimer = 0.98;
+          this.hasDoneAirTrick = false;
+          this.airStuntActive = false;
+          this.barrelRollProgress = 0;
           this.lifetimeStats.totalJumps += 1;
           this.speed = Math.max(this.speed + 4.2, 16.8);
-          this.bannerText = '🦅 特技飞跃！凌空翱翔';
+          this.bannerText = '🦅 特技飞跃！[空格] 施展 360° 回旋';
           this.bannerTimer = 1.8;
           coastalAudio.playJump();
           this.checkAchievement('stunt_rider');
@@ -1481,15 +1598,26 @@ export class PelicanScene {
     let jumpY = 0;
     if (this.isJumpingAir) {
       this.airJumpTimer -= dt;
-      const progress = 1 - Math.max(0, this.airJumpTimer) / 0.92;
-      jumpY = Math.sin(progress * Math.PI) * 2.4;
+      const progress = 1 - Math.max(0, this.airJumpTimer) / 0.98;
+      jumpY = Math.sin(progress * Math.PI) * 2.5;
+
       // Pelican wings spread wide in mid-air trick!
       this.playerRig.leftWing.rotation.z = 0.45 + Math.sin(progress * Math.PI * 4) * 0.15;
       this.playerRig.rightWing.rotation.z = -0.45 - Math.sin(progress * Math.PI * 4) * 0.15;
       this.playerRig.bodyGroup.rotation.x = -0.22 + progress * 0.44;
 
+      // If 360-degree stunt is active, roll full 360 around Z axis
+      if (this.airStuntActive) {
+        this.barrelRollProgress = Math.min(1, this.barrelRollProgress + dt * 2.5);
+        this.playerRig.group.rotation.z = this.barrelRollProgress * Math.PI * 2;
+      }
+
       if (this.airJumpTimer <= 0) {
         this.isJumpingAir = false;
+        this.airStuntActive = false;
+        this.hasDoneAirTrick = false;
+        this.barrelRollProgress = 0;
+        this.playerRig.group.rotation.z = 0;
         jumpY = 0;
         coastalAudio.playLanding();
         // Landing dust particles
@@ -1850,6 +1978,14 @@ export class PelicanScene {
     rainMat.opacity += (targetRainOpacity - rainMat.opacity) * Math.min(1, 3.5 * dt);
     this.isRaining = rainMat.opacity > 0.05;
 
+    // Dynamic Road Surface Wetness Reflection during storm rain
+    if (this.roadMat) {
+      const targetRoughness = this.isRaining ? 0.22 : 0.88;
+      const targetMetalness = this.isRaining ? 0.38 : 0.05;
+      this.roadMat.roughness += (targetRoughness - this.roadMat.roughness) * Math.min(1, 2.5 * dt);
+      this.roadMat.metalness += (targetMetalness - this.roadMat.metalness) * Math.min(1, 2.5 * dt);
+    }
+
     if (rainMat.opacity > 0.01) {
       this.rainRig.lineSegments.position.set(this.playerX, 0, this.playerZ);
       const pos = this.rainRig.positions;
@@ -1977,8 +2113,17 @@ export class PelicanScene {
 
     // Coastal lighthouse rotation & recycling along endless coast
     this.lighthouseRig.beamGroup.rotation.y += dt * 1.55;
+    const distToLighthouse = Math.abs(this.lighthouseRig.group.position.z - this.playerZ);
+    if (distToLighthouse < 22 && !this.lighthousePassed) {
+      this.lighthousePassed = true;
+      coastalAudio.playFoghorn();
+      this.bannerText = '🗼 掠过海角红白守望灯塔';
+      this.bannerTimer = 2.4;
+      this.checkAchievement('lighthouse_beacon');
+    }
     if (this.lighthouseRig.group.position.z > this.playerZ + 60) {
       this.lighthouseRig.group.position.z = this.playerZ - 280;
+      this.lighthousePassed = false;
     }
 
     // Offshore wind turbines rotation & recycling
@@ -2283,6 +2428,10 @@ export class PelicanScene {
       driftChargeLevel: this.driftChargeLevel,
       masterVolume: coastalAudio.getMasterVolume(),
       lifetimeStats: { ...this.lifetimeStats },
+      cadenceRpm: this.cadenceRpm,
+      heartRateBpm: Math.round(this.heartRateBpm),
+      caloriesKcal: Math.round(this.caloriesKcal * 10) / 10,
+      gradientPct: Number(this.gradientPct.toFixed(1)),
     });
   }
 

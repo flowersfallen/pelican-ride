@@ -51,7 +51,7 @@ export function MobileControls({
             <kbd className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[11px]">C</kbd> 切换视角
           </span>
           <span>
-            <kbd className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[11px]">Space</kbd> 叮铃
+            <kbd className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[11px]">Space</kbd> 叮铃 / 360°凌空特技
           </span>
         </div>
       </div>

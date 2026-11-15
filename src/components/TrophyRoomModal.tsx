@@ -19,6 +19,9 @@ const ALL_ACHIEVEMENT_IDS: AchievementId[] = [
   'lantern_keeper',
   'traffic_slalom',
   'drift_master',
+  'lighthouse_beacon',
+  'custom_garage',
+  'aerial_acrobat',
 ];
 
 export function TrophyRoomModal({ hud, onClose }: TrophyRoomModalProps) {

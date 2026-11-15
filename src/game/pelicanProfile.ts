@@ -11,10 +11,10 @@ const TITLES = [
   '叼鱼专家',
 ];
 
-const HATS: HatStyle[] = ['cap', 'straw', 'visor', 'crown'];
-const HAT_COLORS = ['#2563EB', '#E14D2A', '#0D9488', '#D97706', '#7C3AED'];
+const HATS: HatStyle[] = ['cap', 'straw', 'visor', 'crown', 'captain', 'flowers'];
+const HAT_COLORS = ['#2563EB', '#E14D2A', '#0D9488', '#D97706', '#7C3AED', '#1E293B'];
 const SCARF_COLORS = ['#F97316', '#EC4899', '#14B8A6', '#FACC15', '#38BDF8'];
-const FRAME_COLORS = ['#E14D2A', '#0E7490', '#2563EB', '#059669', '#D97706'];
+const FRAME_COLORS = ['#0EA5E9', '#F97316', '#10B981', '#EAB308', '#8B5CF6', '#F8FAFC'];
 const ACCENT_COLORS = ['#F59E0B', '#38BDF8', '#FB7185', '#34D399'];
 
 function pick<T>(arr: T[]): T {

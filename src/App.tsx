@@ -46,6 +46,10 @@ const INITIAL_HUD: GameHudState = {
   isDrifting: false,
   driftChargeLevel: 0,
   masterVolume: 1.0,
+  cadenceRpm: 0,
+  heartRateBpm: 115,
+  caloriesKcal: 0,
+  gradientPct: 0,
   lifetimeStats: {
     totalDistanceMeters: 0,
     totalTsunamisSurvived: 0,
@@ -244,6 +248,7 @@ export function App() {
           onCycleCamera={handleCycleCamera}
           onSetGraphicQuality={handleSetGraphicQuality}
           onOpenTrophyRoom={handleOpenTrophyRoom}
+          onOpenWardrobe={handleOpenWardrobe}
           onSetMasterVolume={handleSetMasterVolume}
         />
       )}

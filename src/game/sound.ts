@@ -748,6 +748,102 @@ class CoastalAudioEngine {
       // Audio fallback
     }
   }
+
+  public playFoghorn(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      // Resonant deep nautical foghorn with harmonic blend
+      const baseFreq = 110; // A2
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(450, now);
+      filter.Q.setValueAtTime(3.5, now);
+
+      const mainGain = this.ctx.createGain();
+      mainGain.gain.setValueAtTime(0.0001, now);
+      mainGain.gain.linearRampToValueAtTime(0.12, now + 0.35);
+      mainGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.85);
+
+      filter.connect(mainGain);
+      mainGain.connect(this.getDestination());
+
+      [1, 2, 3].forEach((mult, idx) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        osc.type = idx === 0 ? 'sawtooth' : 'triangle';
+        osc.frequency.setValueAtTime(baseFreq * mult + (idx === 1 ? 0.7 : -0.5), now);
+        const oscGain = this.ctx.createGain();
+        oscGain.gain.value = 1 / (mult * 1.2);
+        osc.connect(oscGain);
+        oscGain.connect(filter);
+        osc.start(now);
+        osc.stop(now + 1.9);
+      });
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playStuntSpin(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      // Pentatonic celebratory ascending sparkle
+      [1046.5, 1318.51, 1567.98, 2093.0].forEach((freq, idx) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.05);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.08, now + idx * 0.05 + 0.22);
+        gain.gain.setValueAtTime(0.0001, now + idx * 0.05);
+        gain.gain.linearRampToValueAtTime(0.09, now + idx * 0.05 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.05 + 0.28);
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(now + idx * 0.05);
+        osc.stop(now + idx * 0.05 + 0.3);
+      });
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playHeartbeat(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      // Deep visceral double-thump (lub-dub)
+      [0, 0.11].forEach((delay, idx) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const freq = idx === 0 ? 54 : 46;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + delay);
+        osc.frequency.exponentialRampToValueAtTime(28, now + delay + 0.12);
+        gain.gain.setValueAtTime(0.0001, now + delay);
+        gain.gain.linearRampToValueAtTime(0.14, now + delay + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.15);
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(now + delay);
+        osc.stop(now + delay + 0.16);
+      });
+    } catch {
+      // Audio fallback
+    }
+  }
 }
 
 export const coastalAudio = new CoastalAudioEngine();
