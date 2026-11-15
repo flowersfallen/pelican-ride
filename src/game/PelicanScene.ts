@@ -4,22 +4,27 @@ import {
   nextRandomCalmDuration,
 } from './disasterScheduler';
 import {
+  CrabRig,
   createCloudMesh,
   createCollectibleMesh,
+  createCrabMesh,
   createDolphinMesh,
   createJumpRampMesh,
   createLighthouseMesh,
   createMountainRidge,
   createPalmTreeMesh,
   createPelicanRiderMesh,
+  createRainSystem,
   createRoadSignMesh,
   createSeagullMesh,
   createStarfield,
+  createTrafficConeMesh,
   createTsunamiWallMesh,
   DolphinRig,
   LighthouseRig,
   PelicanRig,
   SeagullRig,
+  TrafficConeRig,
   TsunamiRig,
 } from './meshes';
 import {
@@ -36,6 +41,7 @@ import {
   GameHudState,
   GraphicQuality,
   InputState,
+  LifetimeStats,
   PelicanIdentity,
   PickupCounts,
   TimeOfDay,
@@ -69,6 +75,7 @@ const SEGMENT_LENGTH = 18;
 const SEGMENT_COUNT = 16;
 const STORAGE_BEST_KEY = 'pelican_ride_best_meters_v1';
 const STORAGE_ACHIEVEMENTS_KEY = 'pelican_ride_achievements_v1';
+const STORAGE_LIFETIME_KEY = 'pelican_ride_lifetime_stats_v1';
 
 export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
   first_mile: {
@@ -113,6 +120,24 @@ export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
     desc: '冲上木质跳台腾空飞翔，施展特技！',
     icon: '🦅',
   },
+  crab_whisperer: {
+    id: 'crab_whisperer',
+    title: '鸣铃惊蟹',
+    desc: '在沙滩旁按响车铃，惊起横行招潮蟹！',
+    icon: '🦀',
+  },
+  lantern_keeper: {
+    id: 'lantern_keeper',
+    title: '暗夜守灯',
+    desc: '点亮探照强光车灯，破雾疾驰！',
+    icon: '💡',
+  },
+  traffic_slalom: {
+    id: 'traffic_slalom',
+    title: '敏捷破障',
+    desc: '撞飞或机敏避开路面交通警示锥！',
+    icon: '🚧',
+  },
 };
 
 export class PelicanScene {
@@ -155,8 +180,12 @@ export class PelicanScene {
   private dolphins: DolphinRig[] = [];
   private roadSigns: THREE.Group[] = [];
   private jumpRamps: THREE.Group[] = [];
+  private crabs: CrabRig[] = [];
+  private trafficCones: TrafficConeRig[] = [];
+  private rainRig!: { lineSegments: THREE.LineSegments; positions: Float32Array; count: number };
   private cameraMode: 'action' | 'chill' | 'drone' = 'action';
   private lastWhooshTime = 0;
+  private lastRatchetTime = 0;
 
   // Game simulation state
   private playerX = 1.6;
@@ -180,12 +209,22 @@ export class PelicanScene {
   private lightningTimer = 0;
   private lightningFlashTimer = 0;
   private headlightTimer = 0;
+  private isRaining = false;
 
   // Combo & Drafting Mechanics
   private comboCount = 0;
   private comboTimer = 0;
   private isDrafting = false;
   private timeOfDay: TimeOfDay = 'noon';
+
+  // Career Lifetime Stats
+  private lifetimeStats: LifetimeStats = {
+    totalDistanceMeters: 0,
+    totalTsunamisSurvived: 0,
+    totalPickups: 0,
+    maxSpeedKmh: 0,
+    totalJumps: 0,
+  };
 
   // Achievements
   private unlockedAchievements = new Set<AchievementId>();
@@ -244,6 +283,18 @@ export class PelicanScene {
         if (Array.isArray(arr)) {
           arr.forEach((id) => this.unlockedAchievements.add(id as AchievementId));
         }
+      }
+
+      const rawLifetime = localStorage.getItem(STORAGE_LIFETIME_KEY);
+      if (rawLifetime) {
+        const parsed = JSON.parse(rawLifetime);
+        this.lifetimeStats = {
+          totalDistanceMeters: Number(parsed.totalDistanceMeters) || 0,
+          totalTsunamisSurvived: Number(parsed.totalTsunamisSurvived) || 0,
+          totalPickups: Number(parsed.totalPickups) || 0,
+          maxSpeedKmh: Number(parsed.maxSpeedKmh) || 0,
+          totalJumps: Number(parsed.totalJumps) || 0,
+        };
       }
     } catch {
       // Ignore storage failures in private modes
@@ -583,6 +634,43 @@ export class PelicanScene {
       this.jumpRamps.push(ramp);
       this.scene.add(ramp);
     }
+
+    // Beach Crabs on the sandy shore (+X)
+    for (let i = 0; i < 4; i++) {
+      const crab = createCrabMesh();
+      crab.baseX = ROAD_HALF_WIDTH + 2.2 + (i % 2) * 1.8;
+      crab.group.position.set(crab.baseX, 0, -32 - i * 65);
+      this.crabs.push(crab);
+      this.scene.add(crab.group);
+    }
+
+    // Traffic Safety Cones along lane divider lines
+    const conePositions = [
+      { x: -2.2, z: -45 },
+      { x: 2.2, z: -115 },
+      { x: -2.2, z: -185 },
+      { x: 2.2, z: -255 },
+    ];
+    for (const cp of conePositions) {
+      const cone = createTrafficConeMesh();
+      cone.baseX = cp.x;
+      cone.baseZ = cp.z;
+      cone.group.position.set(cp.x, 0, cp.z);
+      this.trafficCones.push(cone);
+      this.scene.add(cone.group);
+    }
+
+    // Coastal Rain particle line segments
+    this.rainRig = createRainSystem();
+    this.scene.add(this.rainRig.lineSegments);
+  }
+
+  private saveLifetimeStats(): void {
+    try {
+      localStorage.setItem(STORAGE_LIFETIME_KEY, JSON.stringify(this.lifetimeStats));
+    } catch {
+      // Ignore
+    }
   }
 
   private spawnPlayer(): void {
@@ -647,6 +735,16 @@ export class PelicanScene {
     this.bellRingCount += 1;
     if (this.bellRingCount >= 10) {
       this.checkAchievement('bell_ringer');
+    }
+
+    // Scuttle crabs when bell sounds nearby
+    for (const crab of this.crabs) {
+      const dz = Math.abs(crab.group.position.z - this.playerZ);
+      if (dz < 18) {
+        crab.fleeTimer = 2.4;
+        coastalAudio.playCrabScuttle();
+        this.checkAchievement('crab_whisperer');
+      }
     }
   }
 
@@ -763,6 +861,29 @@ export class PelicanScene {
       ramp.position.set(idx % 2 === 0 ? -3.6 : 3.8, 0, rampZPositions[idx] || -75);
     });
 
+    const conePositions = [
+      { x: -2.2, z: -45 },
+      { x: 2.2, z: -115 },
+      { x: -2.2, z: -185 },
+      { x: 2.2, z: -255 },
+    ];
+    this.trafficCones.forEach((cone, idx) => {
+      const cp = conePositions[idx % conePositions.length];
+      cone.isHit = false;
+      cone.baseX = cp.x;
+      cone.baseZ = cp.z;
+      cone.group.position.set(cp.x, 0, cp.z);
+      cone.group.rotation.set(0, 0, 0);
+      cone.vel.set(0, 0, 0);
+      cone.rotVel.set(0, 0, 0);
+    });
+
+    this.crabs.forEach((crab, idx) => {
+      crab.baseX = ROAD_HALF_WIDTH + 2.2 + (idx % 2) * 1.8;
+      crab.group.position.set(crab.baseX, 0, -32 - idx * 65);
+      crab.fleeTimer = 0;
+    });
+
     this.spawnCompanions();
     this.resetDisasterCycle(true);
     this.applyTierFrameTint();
@@ -806,6 +927,8 @@ export class PelicanScene {
     this.disasterPhase = 'receding';
     this.phaseTimer = 3.2;
     this.tsunamisSurvived += 1;
+    this.lifetimeStats.totalTsunamisSurvived += 1;
+    this.saveLifetimeStats();
     this.bannerText = '☀️ 海啸退潮了！海岸恢复平静，继续惬意慢骑吧';
     this.bannerTimer = 3.4;
     coastalAudio.stopSiren();
@@ -957,6 +1080,7 @@ export class PelicanScene {
 
   private handlePickup(item: CollectibleEntity): void {
     this.pickups[item.type] += 1;
+    this.lifetimeStats.totalPickups += 1;
     this.beakSnapTimer = 0.35;
     coastalAudio.playPickup(item.type);
 
@@ -1007,6 +1131,7 @@ export class PelicanScene {
       this.bannerText = '💡 探照强光！点亮海岸公路 · 破雾疾驰';
       this.bannerTimer = 2.4;
       coastalAudio.playWhoosh();
+      this.checkAchievement('lantern_keeper');
     } else {
       this.shieldTimer = Math.max(this.shieldTimer, 6.0);
       this.boostTimer = Math.max(this.boostTimer, 1.8);
@@ -1113,6 +1238,22 @@ export class PelicanScene {
     this.speed += (targetSpeed - this.speed) * Math.min(1, accelRate * dt);
     this.playerZ -= this.speed * dt;
 
+    // Career lifetime stats accumulation
+    this.lifetimeStats.totalDistanceMeters += this.speed * dt;
+    const curSpeedKmh = Math.round(this.speed * 3.2);
+    if (curSpeedKmh > this.lifetimeStats.maxSpeedKmh) {
+      this.lifetimeStats.maxSpeedKmh = curSpeedKmh;
+    }
+
+    // Freewheel ratchet ASMR click when coasting without pedaling
+    if (!this.input.accelerate && !this.input.brake && this.speed > 4.5 && this.boostTimer <= 0) {
+      const ratchetInterval = Math.max(0.045, 0.42 / this.speed);
+      if (elapsedSec - this.lastRatchetTime > ratchetInterval) {
+        this.lastRatchetTime = elapsedSec;
+        coastalAudio.playHubRatchet();
+      }
+    }
+
     // Lateral steering (Left = seaward -X, Right = beach +X)
     const steerInput = (this.input.right ? 1 : 0) - (this.input.left ? 1 : 0);
     const targetSteer = steerInput * tier.steerSpeed;
@@ -1172,6 +1313,7 @@ export class PelicanScene {
         if (Math.abs(dx) < 1.35 && Math.abs(dz) < 1.9) {
           this.isJumpingAir = true;
           this.airJumpTimer = 0.92;
+          this.lifetimeStats.totalJumps += 1;
           this.speed = Math.max(this.speed + 4.2, 16.8);
           this.bannerText = '🦅 特技飞跃！凌空翱翔';
           this.bannerTimer = 1.8;
@@ -1238,6 +1380,77 @@ export class PelicanScene {
         seg.position.z -= SEGMENT_COUNT * SEGMENT_LENGTH;
       } else if (seg.position.z < this.playerZ - SEGMENT_COUNT * SEGMENT_LENGTH + SEGMENT_LENGTH * 2) {
         seg.position.z += SEGMENT_COUNT * SEGMENT_LENGTH;
+      }
+    }
+
+    // Beach Crabs scuttling and fleeing
+    for (const crab of this.crabs) {
+      if (crab.group.position.z > this.playerZ + 25) {
+        crab.group.position.z -= 4 * 65;
+        crab.baseX = ROAD_HALF_WIDTH + 2.0 + Math.random() * 2.8;
+        crab.fleeTimer = 0;
+      }
+
+      crab.walkPhase += dt * (crab.fleeTimer > 0 ? 12 : 2.5);
+      crab.leftClaw.rotation.z = Math.sin(crab.walkPhase * 2) * 0.35;
+      crab.rightClaw.rotation.z = -Math.sin(crab.walkPhase * 2) * 0.35;
+      crab.leftClaw.rotation.y = Math.cos(crab.walkPhase) * 0.2;
+      crab.rightClaw.rotation.y = -Math.cos(crab.walkPhase) * 0.2;
+
+      if (crab.fleeTimer > 0) {
+        crab.fleeTimer -= dt;
+        crab.group.position.x += dt * 3.8;
+      } else {
+        crab.group.position.x = crab.baseX + Math.sin(crab.walkPhase) * 0.4;
+      }
+    }
+
+    // Traffic Safety Cones physics & collision slalom
+    for (const cone of this.trafficCones) {
+      if (cone.group.position.z > this.playerZ + 25) {
+        cone.group.position.z -= 4 * 70;
+        cone.baseZ = cone.group.position.z;
+        cone.isHit = false;
+        cone.group.rotation.set(0, 0, 0);
+        cone.group.position.set(cone.baseX, 0, cone.baseZ);
+      }
+
+      if (cone.isHit) {
+        cone.vel.y -= 14 * dt;
+        cone.group.position.addScaledVector(cone.vel, dt);
+        cone.group.rotation.x += cone.rotVel.x * dt;
+        cone.group.rotation.y += cone.rotVel.y * dt;
+        cone.group.rotation.z += cone.rotVel.z * dt;
+
+        if (cone.group.position.y < 0) {
+          cone.group.position.y = 0;
+          cone.vel.set(0, 0, 0);
+          cone.rotVel.set(0, 0, 0);
+        }
+      } else {
+        const dx = this.playerX - cone.group.position.x;
+        const dz = this.playerZ - cone.group.position.z;
+        if (Math.abs(dx) < 0.85 && Math.abs(dz) < 1.1 && !this.isJumpingAir) {
+          cone.isHit = true;
+          cone.vel.set(
+            (this.playerX > cone.group.position.x ? -1 : 1) * (3.5 + Math.random() * 2),
+            4.5 + Math.random() * 2.5,
+            -this.speed * 0.8 - 4,
+          );
+          cone.rotVel.set(
+            (Math.random() - 0.5) * 14,
+            (Math.random() - 0.5) * 14,
+            (Math.random() - 0.5) * 14,
+          );
+          coastalAudio.playConeKnock();
+          this.speed = Math.max(4, this.speed - 2.8);
+          this.bannerText = '🚧 撞飞路锥！机敏破障';
+          this.bannerTimer = 1.4;
+          this.checkAchievement('traffic_slalom');
+          try {
+            navigator.vibrate?.([40]);
+          } catch {}
+        }
       }
     }
 
@@ -1325,6 +1538,7 @@ export class PelicanScene {
         this.submergedTimer += dt;
         if (this.submergedTimer >= 0.22) {
           this.isGameOver = true;
+          this.saveLifetimeStats();
           coastalAudio.playGameOver();
           // Massive wipeout ocean splash eruption
           const splashGeo = new THREE.SphereGeometry(0.22, 5, 5);
@@ -1477,6 +1691,45 @@ export class PelicanScene {
     }
     if (this.playerRig.headlightMesh) {
       this.playerRig.headlightMesh.visible = isHeadlightActive;
+    }
+
+    // Coastal Rain system update
+    const rainMat = this.rainRig.lineSegments.material as THREE.LineBasicMaterial;
+    const targetRainOpacity = isThreat ? 0.72 : 0;
+    rainMat.opacity += (targetRainOpacity - rainMat.opacity) * Math.min(1, 3.5 * dt);
+    this.isRaining = rainMat.opacity > 0.05;
+
+    if (rainMat.opacity > 0.01) {
+      this.rainRig.lineSegments.position.set(this.playerX, 0, this.playerZ);
+      const pos = this.rainRig.positions;
+      const count = this.rainRig.count;
+      const fallSpeed = 36 * dt;
+      const windX = 8.5 * dt;
+      const windZ = 12 * dt;
+
+      for (let i = 0; i < count; i++) {
+        pos[i * 6 + 1] -= fallSpeed;
+        pos[i * 6] += windX;
+        pos[i * 6 + 2] += windZ;
+
+        pos[i * 6 + 4] -= fallSpeed;
+        pos[i * 6 + 3] += windX;
+        pos[i * 6 + 5] += windZ;
+
+        if (pos[i * 6 + 4] < 0) {
+          const rx = (Math.random() - 0.5) * 32;
+          const ry = 14 + Math.random() * 8;
+          const rz = (Math.random() - 0.5) * 55;
+          const len = 0.85 + Math.random() * 0.45;
+          pos[i * 6] = rx;
+          pos[i * 6 + 1] = ry;
+          pos[i * 6 + 2] = rz;
+          pos[i * 6 + 3] = rx + 0.35;
+          pos[i * 6 + 4] = ry - len;
+          pos[i * 6 + 5] = rz + 0.45;
+        }
+      }
+      this.rainRig.lineSegments.geometry.attributes.position.needsUpdate = true;
     }
 
     // Bioluminescent foam and ocean glow during night ("Blue Tears" / 荧光海蓝眼泪)
@@ -1761,6 +2014,17 @@ export class PelicanScene {
     const leanPitch = this.input.accelerate || this.boostTimer > 0 ? -0.07 : this.input.brake ? 0.08 : 0;
     rig.bodyGroup.rotation.x += (leanPitch - rig.bodyGroup.rotation.x) * Math.min(1, 8 * dt);
 
+    // Standing athletic sprint rocking pedal (站立摇车冲刺)
+    const isSprinting = this.input.accelerate || this.boostTimer > 0;
+    if (isSprinting && speed > 5) {
+      const rockRoll = Math.sin(this.pedalPhase) * 0.085;
+      rig.bodyGroup.rotation.z += rockRoll;
+      rig.bodyGroup.position.y = 0.08 + Math.abs(Math.sin(this.pedalPhase)) * 0.07;
+      rig.bodyGroup.rotation.x = -0.16;
+    } else {
+      rig.bodyGroup.position.y += (0 - rig.bodyGroup.position.y) * Math.min(1, 10 * dt);
+    }
+
     // Expressive wings & fluttering scarf
     const flapSpeed = this.boostTimer > 0 ? 14 : 4;
     rig.leftWing.rotation.z = 0.2 + Math.sin(elapsedSec * flapSpeed) * 0.08;
@@ -1837,6 +2101,8 @@ export class PelicanScene {
       isPaused: this.isPaused,
       graphicQuality: this.graphicQuality,
       isJumpingAir: this.isJumpingAir,
+      isRaining: this.isRaining,
+      lifetimeStats: { ...this.lifetimeStats },
     });
   }
 

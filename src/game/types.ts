@@ -13,7 +13,10 @@ export type AchievementId =
   | 'combo_frenzy'
   | 'night_rider'
   | 'bell_ringer'
-  | 'stunt_rider';
+  | 'stunt_rider'
+  | 'crab_whisperer'
+  | 'lantern_keeper'
+  | 'traffic_slalom';
 
 export type GraphicQuality = 'high' | 'battery_saver';
 
@@ -22,6 +25,14 @@ export interface Achievement {
   title: string;
   desc: string;
   icon: string;
+}
+
+export interface LifetimeStats {
+  totalDistanceMeters: number;
+  totalTsunamisSurvived: number;
+  totalPickups: number;
+  maxSpeedKmh: number;
+  totalJumps: number;
 }
 
 export interface PelicanIdentity {
@@ -92,4 +103,6 @@ export interface GameHudState {
   isPaused: boolean;
   graphicQuality: GraphicQuality;
   isJumpingAir: boolean;
+  isRaining: boolean;
+  lifetimeStats: LifetimeStats;
 }

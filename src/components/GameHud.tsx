@@ -6,6 +6,7 @@ import {
   Pause,
   RefreshCw,
   Shield,
+  Trophy,
   Volume2,
   VolumeX,
   Waves,
@@ -22,6 +23,7 @@ interface GameHudProps {
   onCycleCamera: () => void;
   onTogglePause: () => void;
   onOpenWardrobe: () => void;
+  onOpenTrophyRoom: () => void;
 }
 
 export function GameHud({
@@ -33,14 +35,27 @@ export function GameHud({
   onCycleCamera,
   onTogglePause,
   onOpenWardrobe,
+  onOpenTrophyRoom,
 }: GameHudProps) {
   const isWarning = hud.disasterPhase === 'warning';
   const isActive = hud.disasterPhase === 'active';
   const xpPct = Math.min(100, Math.round((hud.xp / Math.max(1, hud.xpToNext)) * 100));
   const dangerPct = Math.max(0, Math.min(100, ((16 - hud.waveGapMeters) / 16) * 100));
+  const isHyperSpeed = hud.speedKmh >= 65 || hud.isJumpingAir;
 
   return (
     <>
+      {/* High-speed wind motion blur radial vignette */}
+      {isHyperSpeed && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-10 opacity-70 animate-pulse"
+          style={{
+            background: 'radial-gradient(circle at center, transparent 45%, rgba(56, 189, 248, 0.22) 80%, rgba(254, 240, 138, 0.35) 100%)',
+          }}
+        />
+      )}
+
       {/* Full-viewport red warning vignette when tsunami approaches */}
       {(isWarning || (isActive && hud.waveGapMeters < 6)) && (
         <div
@@ -176,6 +191,17 @@ export function GameHud({
 
             <button
               type="button"
+              onClick={onOpenTrophyRoom}
+              aria-label="打开荣誉陈列馆与成就"
+              className="inline-flex items-center gap-1 rounded-xl border border-amber-400/35 bg-slate-950/60 hover:bg-slate-900/80 text-amber-200 px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold shadow-md backdrop-blur transition-colors"
+              title="查看骑行生涯里程、成就与荣誉总览"
+            >
+              <Trophy className="w-3.5 h-3.5 text-amber-300" />
+              <span>成就</span>
+            </button>
+
+            <button
+              type="button"
               onClick={onTogglePause}
               aria-label="暂停游戏"
               className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/30 bg-slate-950/60 hover:bg-slate-900/80 text-white shadow-md backdrop-blur transition-colors"
@@ -277,6 +303,12 @@ export function GameHud({
                 <span className="inline-flex items-center gap-1 rounded-full bg-cyan-600/90 text-white px-2.5 py-0.5 text-[11px] font-bold shadow animate-pulse">
                   <span>💨</span>
                   <span>尾流破风中 +15% 极速</span>
+                </span>
+              )}
+              {hud.isRaining && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-blue-700/85 text-white px-2.5 py-0.5 text-[11px] font-bold shadow">
+                  <span>🌧️</span>
+                  <span>海风暴雨来袭</span>
                 </span>
               )}
               {hud.headlightRemainingSec > 0 && (

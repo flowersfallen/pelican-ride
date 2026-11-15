@@ -5,6 +5,7 @@ import {
   Play,
   RotateCcw,
   Sparkles,
+  Trophy,
   Volume2,
   VolumeX,
   X,
@@ -19,6 +20,7 @@ interface PauseMenuModalProps {
   onToggleMute: () => void;
   onCycleCamera: () => void;
   onSetGraphicQuality: (quality: GraphicQuality) => void;
+  onOpenTrophyRoom: () => void;
 }
 
 export function PauseMenuModal({
@@ -28,6 +30,7 @@ export function PauseMenuModal({
   onToggleMute,
   onCycleCamera,
   onSetGraphicQuality,
+  onOpenTrophyRoom,
 }: PauseMenuModalProps) {
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
 
@@ -87,12 +90,17 @@ export function PauseMenuModal({
               Lv.{hud.level}
             </div>
           </div>
-          <div>
-            <div className="text-[10px] text-slate-400">已解锁成就</div>
-            <div className="text-sm sm:text-base font-bold text-sky-300 font-mono mt-0.5">
-              {hud.totalAchievementsUnlocked} / 7
+          <button
+            type="button"
+            onClick={onOpenTrophyRoom}
+            className="hover:bg-white/10 rounded-xl p-1 transition-colors text-left"
+            title="点击打开荣誉陈列馆"
+          >
+            <div className="text-[10px] text-amber-300 font-medium">已解锁成就 ❯</div>
+            <div className="text-sm sm:text-base font-bold text-amber-300 font-mono mt-0.5">
+              {hud.totalAchievementsUnlocked} / 10
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Quick Settings Toggles */}
@@ -199,14 +207,25 @@ export function PauseMenuModal({
             <span>继续骑行 [ESC]</span>
           </button>
 
-          <button
-            type="button"
-            onClick={onRestart}
-            className="w-full py-2.5 px-4 rounded-2xl bg-white/10 hover:bg-white/15 text-slate-200 font-semibold text-xs border border-white/15 flex items-center justify-center gap-2 transition-colors"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>重新开始这趟旅程</span>
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={onOpenTrophyRoom}
+              className="py-2.5 px-3 rounded-2xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 font-semibold text-xs border border-amber-400/30 flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <Trophy className="w-3.5 h-3.5 text-amber-400" />
+              <span>荣誉陈列馆</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onRestart}
+              className="py-2.5 px-3 rounded-2xl bg-white/10 hover:bg-white/15 text-slate-200 font-semibold text-xs border border-white/15 flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>重新开始</span>
+            </button>
+          </div>
         </div>
 
         {/* Keyboard Tips */}

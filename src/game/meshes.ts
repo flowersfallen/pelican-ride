@@ -1396,3 +1396,174 @@ export function createJumpRampMesh(): THREE.Group {
 
   return group;
 }
+
+export interface CrabRig {
+  group: THREE.Group;
+  leftClaw: THREE.Group;
+  rightClaw: THREE.Group;
+  walkPhase: number;
+  baseX: number;
+  fleeTimer: number;
+}
+
+export function createCrabMesh(): CrabRig {
+  const group = new THREE.Group();
+  const shellMat = new THREE.MeshStandardMaterial({
+    color: 0xf97316, // Orange coastal crab shell
+    roughness: 0.6,
+    flatShading: true,
+  });
+  const clawMat = new THREE.MeshStandardMaterial({
+    color: 0xef4444, // Vibrant red pincers
+    roughness: 0.5,
+    flatShading: true,
+  });
+
+  // Shell body
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.14, 8), shellMat);
+  body.scale.set(1.1, 0.8, 0.85);
+  body.position.y = 0.12;
+  body.castShadow = true;
+  group.add(body);
+
+  // Stalk eyes
+  [-0.08, 0.08].forEach((ex) => {
+    const eye = new THREE.Mesh(
+      new THREE.SphereGeometry(0.045, 6, 6),
+      new THREE.MeshBasicMaterial({ color: 0x0f172a }),
+    );
+    eye.position.set(ex, 0.22, -0.15);
+    group.add(eye);
+  });
+
+  // Pincers / Claws
+  const createClaw = (dir: number) => {
+    const clawGroup = new THREE.Group();
+    clawGroup.position.set(dir * 0.28, 0.14, -0.18);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.05, 0.06), clawMat);
+    arm.position.set(dir * 0.07, 0, 0);
+    clawGroup.add(arm);
+    const pincer = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.18, 5), clawMat);
+    pincer.rotation.z = (-dir * Math.PI) / 4;
+    pincer.position.set(dir * 0.16, 0.04, 0);
+    clawGroup.add(pincer);
+    return clawGroup;
+  };
+
+  const leftClaw = createClaw(-1);
+  const rightClaw = createClaw(1);
+  group.add(leftClaw, rightClaw);
+
+  // Tiny walking legs
+  const legMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.7 });
+  for (let i = 0; i < 3; i++) {
+    [-1, 1].forEach((dir) => {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.03, 0.03), legMat);
+      leg.position.set(dir * 0.26, 0.05, (i - 1) * 0.1);
+      leg.rotation.z = dir * 0.35;
+      group.add(leg);
+    });
+  }
+
+  return {
+    group,
+    leftClaw,
+    rightClaw,
+    walkPhase: Math.random() * Math.PI * 2,
+    baseX: 7.2,
+    fleeTimer: 0,
+  };
+}
+
+export interface TrafficConeRig {
+  group: THREE.Group;
+  hitTimer: number;
+  vel: THREE.Vector3;
+  rotVel: THREE.Vector3;
+  baseX: number;
+  baseZ: number;
+  isHit: boolean;
+}
+
+export function createTrafficConeMesh(): TrafficConeRig {
+  const group = new THREE.Group();
+  const orangeMat = new THREE.MeshStandardMaterial({
+    color: 0xf97316,
+    roughness: 0.4,
+    flatShading: true,
+  });
+  const whiteMat = new THREE.MeshStandardMaterial({
+    color: 0xf8fafc,
+    roughness: 0.2,
+    metalness: 0.3,
+  });
+  const baseMat = new THREE.MeshStandardMaterial({
+    color: 0x1e293b,
+    roughness: 0.8,
+  });
+
+  // Square rubber base
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.06, 0.65), baseMat);
+  base.position.y = 0.03;
+  base.castShadow = true;
+  base.receiveShadow = true;
+  group.add(base);
+
+  // Orange cone
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.85, 8), orangeMat);
+  cone.position.y = 0.48;
+  cone.castShadow = true;
+  group.add(cone);
+
+  // Reflective white band
+  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.19, 0.22, 8), whiteMat);
+  collar.position.y = 0.45;
+  group.add(collar);
+
+  return {
+    group,
+    hitTimer: 0,
+    vel: new THREE.Vector3(),
+    rotVel: new THREE.Vector3(),
+    baseX: 0,
+    baseZ: 0,
+    isHit: false,
+  };
+}
+
+export function createRainSystem(): {
+  lineSegments: THREE.LineSegments;
+  positions: Float32Array;
+  count: number;
+} {
+  const count = 380;
+  const positions = new Float32Array(count * 6);
+
+  for (let i = 0; i < count; i++) {
+    const rx = (Math.random() - 0.5) * 28;
+    const ry = 1.0 + Math.random() * 18;
+    const rz = (Math.random() - 0.5) * 60;
+    const len = 0.85 + Math.random() * 0.45;
+
+    positions[i * 6] = rx;
+    positions[i * 6 + 1] = ry;
+    positions[i * 6 + 2] = rz;
+
+    // Slanted rain streak blown by ocean headwind
+    positions[i * 6 + 3] = rx + 0.35;
+    positions[i * 6 + 4] = ry - len;
+    positions[i * 6 + 5] = rz + 0.45;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.LineBasicMaterial({
+    color: 0xcffafe,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+  });
+  const lineSegments = new THREE.LineSegments(geo, mat);
+
+  return { lineSegments, positions, count };
+}

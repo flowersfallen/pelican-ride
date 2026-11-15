@@ -3,6 +3,7 @@ import { GameHud } from './components/GameHud';
 import { GameOverModal } from './components/GameOverModal';
 import { MobileControls } from './components/MobileControls';
 import { PauseMenuModal } from './components/PauseMenuModal';
+import { TrophyRoomModal } from './components/TrophyRoomModal';
 import { WardrobeModal } from './components/WardrobeModal';
 import { PelicanScene } from './game/PelicanScene';
 import { createRandomPelicanIdentity } from './game/pelicanProfile';
@@ -41,6 +42,14 @@ const INITIAL_HUD: GameHudState = {
   isPaused: false,
   graphicQuality: 'high',
   isJumpingAir: false,
+  isRaining: false,
+  lifetimeStats: {
+    totalDistanceMeters: 0,
+    totalTsunamisSurvived: 0,
+    totalPickups: 0,
+    maxSpeedKmh: 0,
+    totalJumps: 0,
+  },
 };
 
 export function App() {
@@ -48,6 +57,7 @@ export function App() {
   const engineRef = useRef<PelicanScene | null>(null);
   const [hud, setHud] = useState<GameHudState>(INITIAL_HUD);
   const [isWardrobeOpen, setIsWardrobeOpen] = useState(false);
+  const [isTrophyRoomOpen, setIsTrophyRoomOpen] = useState(false);
 
   useEffect(() => {
     const el = mountRef.current;
@@ -88,7 +98,9 @@ export function App() {
         return;
       }
       if (e.code === 'Escape' && !e.repeat) {
-        if (isWardrobeOpen) {
+        if (isTrophyRoomOpen) {
+          setIsTrophyRoomOpen(false);
+        } else if (isWardrobeOpen) {
           setIsWardrobeOpen(false);
         } else {
           engineRef.current?.togglePause();
@@ -126,7 +138,7 @@ export function App() {
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [hud.isGameOver, isWardrobeOpen]);
+  }, [hud.isGameOver, isWardrobeOpen, isTrophyRoomOpen]);
 
   const handleInputChange = useCallback((patch: Partial<InputState>) => {
     coastalAudio.unlock();
@@ -160,6 +172,14 @@ export function App() {
 
   const handleCloseWardrobe = useCallback(() => {
     setIsWardrobeOpen(false);
+  }, []);
+
+  const handleOpenTrophyRoom = useCallback(() => {
+    setIsTrophyRoomOpen(true);
+  }, []);
+
+  const handleCloseTrophyRoom = useCallback(() => {
+    setIsTrophyRoomOpen(false);
   }, []);
 
   const handleUpdateIdentity = useCallback((patch: Partial<PelicanIdentity>) => {
@@ -196,6 +216,7 @@ export function App() {
         onCycleCamera={handleCycleCamera}
         onTogglePause={handleTogglePause}
         onOpenWardrobe={handleOpenWardrobe}
+        onOpenTrophyRoom={handleOpenTrophyRoom}
       />
 
       {/* PC Keyboard Guide & Mobile Touch Controls */}
@@ -206,7 +227,7 @@ export function App() {
       />
 
       {/* Pause Menu Modal */}
-      {hud.isPaused && !hud.isGameOver && !isWardrobeOpen && (
+      {hud.isPaused && !hud.isGameOver && !isWardrobeOpen && !isTrophyRoomOpen && (
         <PauseMenuModal
           hud={hud}
           onResume={handleTogglePause}
@@ -214,6 +235,7 @@ export function App() {
           onToggleMute={handleToggleMute}
           onCycleCamera={handleCycleCamera}
           onSetGraphicQuality={handleSetGraphicQuality}
+          onOpenTrophyRoom={handleOpenTrophyRoom}
         />
       )}
 
@@ -226,11 +248,20 @@ export function App() {
         />
       )}
 
+      {/* Trophy Room & Lifetime Career Stats Modal */}
+      {isTrophyRoomOpen && (
+        <TrophyRoomModal
+          hud={hud}
+          onClose={handleCloseTrophyRoom}
+        />
+      )}
+
       {/* Tsunami Wipeout Summary Modal */}
       <GameOverModal
         hud={hud}
         onRestartSame={handleRestartSame}
         onRestartNewPelican={handleRerollPelican}
+        onOpenTrophyRoom={handleOpenTrophyRoom}
       />
     </main>
   );
