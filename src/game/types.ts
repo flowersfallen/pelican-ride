@@ -34,7 +34,9 @@ export type AchievementId =
   | 'twilight_dreamer'
   | 'peloton_spirit'
   | 'ocean_whale'
-  | 'century_rider';
+  | 'century_rider'
+  | 'bonfire_gatherer'
+  | 'grand_tour_master';
 
 export type GraphicQuality = 'high' | 'battery_saver';
 

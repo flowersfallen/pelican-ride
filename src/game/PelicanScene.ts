@@ -333,6 +333,18 @@ export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
     desc: '沿 G228 沿海公路突破 3,000 米长途巡礼，座驾登顶【海角传说】！',
     icon: '🏆',
   },
+  bonfire_gatherer: {
+    id: 'bonfire_gatherer',
+    title: '海风营火',
+    desc: '在沙滩露营地伴着海风驻足听柴火噼啪，领略微光萤火虫！',
+    icon: '⛺',
+  },
+  grand_tour_master: {
+    id: 'grand_tour_master',
+    title: '海角大满贯',
+    desc: '集齐海洋战利品五大珍宝（鱼、虾、海星、海草、探照灯），达成海角大满贯！',
+    icon: '🌟',
+  },
 };
 
 export class PelicanScene {
@@ -1770,6 +1782,24 @@ export class PelicanScene {
         life: 0.5,
       });
     }
+
+    // Expanding sea foam splash ripple ring
+    const ringGeo = new THREE.RingGeometry(0.5, 0.75, 16);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: isNight ? 0x22d3ee : 0xe0f2fe,
+      transparent: true,
+      opacity: isNight ? 0.85 : 0.65,
+      side: THREE.DoubleSide,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(x, 0.05, z);
+    this.scene.add(ring);
+    this.particles.push({
+      mesh: ring,
+      vel: new THREE.Vector3(0, 0, 0),
+      life: 0.8,
+    });
   }
 
   private handlePickup(item: CollectibleEntity): void {
@@ -1801,6 +1831,17 @@ export class PelicanScene {
         }
         this.checkAchievement('combo_frenzy');
       }
+    }
+
+    // Grand Tour Master Check (All 5 ocean treasures gathered)
+    if (
+      this.pickups.fish >= 3 &&
+      this.pickups.shrimp >= 3 &&
+      this.pickups.starfish >= 2 &&
+      this.pickups.seaweed >= 2 &&
+      this.pickups.lantern >= 1
+    ) {
+      this.checkAchievement('grand_tour_master');
     }
 
     const colorMap: Record<CollectibleType, number> = {
@@ -3040,6 +3081,7 @@ export class PelicanScene {
         coastalAudio.playCampfireCrackle();
         this.bannerText = '⛺ 掠过「海风星空露营地」· 晚风与篝火渐暖';
         this.bannerTimer = 2.4;
+        this.checkAchievement('bonfire_gatherer');
         try {
           navigator.vibrate?.([25, 20, 35]);
         } catch {}
@@ -3456,9 +3498,17 @@ export class PelicanScene {
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.life -= dt;
-      p.vel.y -= 9.5 * dt;
-      p.mesh.position.addScaledVector(p.vel, dt);
-      p.mesh.scale.setScalar(Math.max(0.05, p.life / 0.55));
+      if (p.vel.lengthSq() > 0.0001) {
+        p.vel.y -= 9.5 * dt;
+        p.mesh.position.addScaledVector(p.vel, dt);
+        p.mesh.scale.setScalar(Math.max(0.05, p.life / 0.55));
+      } else {
+        // Flat surface ripple ring: expand radius & fade
+        const progress = 1 - Math.max(0, p.life / 0.8);
+        p.mesh.scale.setScalar(1 + progress * 4.2);
+        const mat = p.mesh.material as THREE.MeshBasicMaterial;
+        if (mat) mat.opacity = (p.life / 0.8) * 0.75;
+      }
       if (p.life <= 0) {
         this.scene.remove(p.mesh);
         this.particles.splice(i, 1);

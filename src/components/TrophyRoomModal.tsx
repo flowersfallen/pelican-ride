@@ -36,6 +36,8 @@ const ALL_ACHIEVEMENT_IDS: AchievementId[] = [
   'peloton_spirit',
   'ocean_whale',
   'century_rider',
+  'bonfire_gatherer',
+  'grand_tour_master',
 ];
 
 export function TrophyRoomModal({ hud, onClose }: TrophyRoomModalProps) {
