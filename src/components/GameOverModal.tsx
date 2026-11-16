@@ -28,7 +28,7 @@ export function GameOverModal({
         : hud.timeOfDay === 'dawn'
         ? '晨曦破晓'
         : '晴空碧海';
-    const text = `🚴‍♂️ 我在《骑行吧！鹈鹕》【${timeLabel}】时段飞驰了 ${hud.distanceMeters} 米！\n🌊 成功躲过 ${hud.tsunamisSurvived} 次滔天巨浪 · 解锁成就 ${hud.totalAchievementsUnlocked}/30 · 座驾升级至【${hud.tierName}】！\n🐟 海洋战利品：小鱼×${hud.pickups.fish} 鲜虾×${hud.pickups.shrimp} 海星×${hud.pickups.starfish} 海草×${hud.pickups.seaweed} 车灯×${hud.pickups.lantern}\n👉 快来挑战我的海滨避浪战绩：https://ride.ridingpelican.com`;
+    const text = `🚴‍♂️ 我在《骑行吧！鹈鹕》【${timeLabel}】时段飞驰了 ${hud.distanceMeters} 米！\n🌊 成功躲过 ${hud.tsunamisSurvived} 次滔天巨浪 · 解锁成就 ${hud.totalAchievementsUnlocked}/31 · 座驾升级至【${hud.tierName}】！\n🐟 海洋战利品：小鱼×${hud.pickups.fish} 鲜虾×${hud.pickups.shrimp} 海星×${hud.pickups.starfish} 海草×${hud.pickups.seaweed} 车灯×${hud.pickups.lantern}\n👉 快来挑战我的海滨避浪战绩：https://ride.ridingpelican.com`;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(text);

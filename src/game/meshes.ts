@@ -21,6 +21,7 @@ export interface PelicanRig {
   taillightMesh?: THREE.Mesh;
   hatGroup?: THREE.Group;
   bikeComputer?: THREE.Group;
+  updateOdometer?: (speedKmh: number, cadenceRpm: number, isBoosted: boolean) => void;
   updateCustomization?: (patch: Partial<PelicanIdentity>) => void;
 }
 
@@ -212,7 +213,7 @@ export function createPelicanRiderMesh(
     handlebarGroup.add(grip);
   });
 
-  // Miniature GPS cycling computer mounted on handlebar stem
+  // Miniature GPS cycling computer mounted on handlebar stem with live digital display
   const computerGroup = new THREE.Group();
   computerGroup.position.set(0, 0.26, 0.02);
   const compCase = new THREE.Mesh(
@@ -220,14 +221,68 @@ export function createPelicanRiderMesh(
     new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.35, flatShading: true }),
   );
   computerGroup.add(compCase);
+
+  const compCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+  let compTexture: THREE.CanvasTexture | null = null;
+  let compCtx: CanvasRenderingContext2D | null = null;
+  if (compCanvas) {
+    compCanvas.width = 128;
+    compCanvas.height = 80;
+    compCtx = compCanvas.getContext('2d');
+    if (compCtx) {
+      compCtx.fillStyle = '#090d16';
+      compCtx.fillRect(0, 0, 128, 80);
+      compCtx.fillStyle = '#38bdf8';
+      compCtx.font = 'bold 15px sans-serif';
+      compCtx.textAlign = 'center';
+      compCtx.fillText('GPS ● SPD', 64, 18);
+      compCtx.fillStyle = '#4ade80';
+      compCtx.font = 'bold 38px monospace';
+      compCtx.fillText('28', 64, 54);
+      compCtx.fillStyle = '#94a3b8';
+      compCtx.font = '13px monospace';
+      compCtx.fillText('KM/H', 64, 72);
+    }
+    compTexture = new THREE.CanvasTexture(compCanvas);
+  }
+
   const compScreen = new THREE.Mesh(
     new THREE.PlaneGeometry(0.082, 0.058),
-    new THREE.MeshBasicMaterial({ color: 0x38bdf8 }),
+    compTexture
+      ? new THREE.MeshBasicMaterial({ map: compTexture })
+      : new THREE.MeshBasicMaterial({ color: 0x38bdf8 }),
   );
   compScreen.rotation.x = -Math.PI / 2.5;
   compScreen.position.set(0, 0.018, 0);
   computerGroup.add(compScreen);
   handlebarGroup.add(computerGroup);
+
+  let lastDispSpeed = -1;
+  let lastDispBoost = false;
+  const updateOdometer = (speedKmh: number, cadenceRpm: number, isBoosted: boolean) => {
+    if (!compCtx || !compCanvas || !compTexture) return;
+    if (speedKmh === lastDispSpeed && isBoosted === lastDispBoost) return;
+    lastDispSpeed = speedKmh;
+    lastDispBoost = isBoosted;
+
+    compCtx.fillStyle = '#090d16';
+    compCtx.fillRect(0, 0, 128, 80);
+
+    compCtx.fillStyle = isBoosted ? '#facc15' : '#38bdf8';
+    compCtx.font = 'bold 15px sans-serif';
+    compCtx.textAlign = 'center';
+    compCtx.fillText(isBoosted ? '⚡ BOOST' : 'GPS ● SPD', 64, 18);
+
+    compCtx.fillStyle = isBoosted ? '#fef08a' : speedKmh > 48 ? '#f43f5e' : '#4ade80';
+    compCtx.font = 'bold 38px monospace';
+    compCtx.fillText(String(Math.max(0, speedKmh)), 64, 54);
+
+    compCtx.fillStyle = '#94a3b8';
+    compCtx.font = '13px monospace';
+    compCtx.fillText(`KM/H ${cadenceRpm}RPM`, 64, 72);
+
+    compTexture.needsUpdate = true;
+  };
 
   // Wicker front basket with a cute fish peeking out
   const basketMat = new THREE.MeshStandardMaterial({
@@ -510,6 +565,7 @@ export function createPelicanRiderMesh(
     taillightMesh,
     hatGroup,
     bikeComputer: computerGroup,
+    updateOdometer,
     updateCustomization,
   };
 }
@@ -2320,6 +2376,188 @@ export function createBeachCampsiteRig(): BeachCampsiteRig {
     fireLight,
     smokeTimer: 0,
   };
+}
+
+export interface CoconutKioskRig {
+  group: THREE.Group;
+  baseZ: number;
+}
+
+export function createCoconutKioskRig(): CoconutKioskRig {
+  const group = new THREE.Group();
+
+  const woodMat = new THREE.MeshStandardMaterial({
+    color: 0x78350f, // Weathered timber
+    roughness: 0.85,
+    flatShading: true,
+  });
+
+  const bambooMat = new THREE.MeshStandardMaterial({
+    color: 0xa16207, // Golden bamboo
+    roughness: 0.75,
+    flatShading: true,
+  });
+
+  const thatchMat = new THREE.MeshStandardMaterial({
+    color: 0x65a30d, // Palm frond green-gold thatch
+    roughness: 0.95,
+    flatShading: true,
+  });
+
+  // 4 corner timber posts
+  const postGeo = new THREE.CylinderGeometry(0.12, 0.14, 3.2, 6);
+  const postOffsets = [
+    [-1.6, -1.2],
+    [1.6, -1.2],
+    [-1.6, 1.2],
+    [1.6, 1.2],
+  ];
+  postOffsets.forEach(([px, pz]) => {
+    const post = new THREE.Mesh(postGeo, woodMat);
+    post.position.set(px, 1.6, pz);
+    post.castShadow = true;
+    group.add(post);
+  });
+
+  // Raised wooden plank floor
+  const floorGeo = new THREE.BoxGeometry(3.6, 0.2, 2.8);
+  const floor = new THREE.Mesh(floorGeo, woodMat);
+  floor.position.set(0, 0.1, 0);
+  floor.receiveShadow = true;
+  group.add(floor);
+
+  // Thatched canopy roof (tiered overhang)
+  const roofTier1 = new THREE.Mesh(new THREE.ConeGeometry(3.2, 1.4, 4), thatchMat);
+  roofTier1.position.set(0, 3.6, 0);
+  roofTier1.rotation.y = Math.PI * 0.25;
+  roofTier1.castShadow = true;
+  group.add(roofTier1);
+
+  const roofTier2 = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1.1, 4), thatchMat);
+  roofTier2.position.set(0, 4.2, 0);
+  roofTier2.rotation.y = Math.PI * 0.25;
+  roofTier2.castShadow = true;
+  group.add(roofTier2);
+
+  // Serving counter bar facing the road
+  const counterGeo = new THREE.BoxGeometry(2.8, 1.05, 0.55);
+  const counter = new THREE.Mesh(counterGeo, bambooMat);
+  counter.position.set(-1.0, 0.7, 0);
+  counter.castShadow = true;
+  group.add(counter);
+
+  // 3 fresh green coconuts with colorful straws on the counter
+  const cocoMat = new THREE.MeshStandardMaterial({
+    color: 0x22c55e, // Fresh tropical green
+    roughness: 0.6,
+    flatShading: true,
+  });
+  const strawMat = new THREE.MeshStandardMaterial({
+    color: 0xf43f5e, // Coral pink straw
+    roughness: 0.3,
+  });
+
+  for (let c = 0; c < 3; c++) {
+    const coco = new THREE.Mesh(new THREE.SphereGeometry(0.16, 7, 6), cocoMat);
+    coco.scale.set(1, 1.15, 1);
+    coco.position.set(-1.0, 1.34, (c - 1) * 0.45);
+    coco.castShadow = true;
+    group.add(coco);
+
+    const straw = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.22, 5), strawMat);
+    straw.rotation.z = 0.25;
+    straw.position.set(-1.03, 1.5, (c - 1) * 0.45);
+    group.add(straw);
+  }
+
+  // Wooden hanging sign with canvas text: "海风椰青"
+  const signCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+  if (signCanvas) {
+    signCanvas.width = 256;
+    signCanvas.height = 96;
+    const sCtx = signCanvas.getContext('2d');
+    if (sCtx) {
+      sCtx.fillStyle = '#78350f';
+      sCtx.fillRect(0, 0, 256, 96);
+      sCtx.strokeStyle = '#fef08a';
+      sCtx.lineWidth = 6;
+      sCtx.strokeRect(6, 6, 244, 84);
+      sCtx.fillStyle = '#fef08a';
+      sCtx.font = 'bold 34px sans-serif';
+      sCtx.textAlign = 'center';
+      sCtx.fillText('🥥 海风椰青', 128, 48);
+      sCtx.font = 'bold 18px sans-serif';
+      sCtx.fillStyle = '#86efac';
+      sCtx.fillText('100% 冰镇海岛电解质', 128, 76);
+    }
+    const signTexture = new THREE.CanvasTexture(signCanvas);
+    const signGeo = new THREE.BoxGeometry(0.08, 0.65, 1.6);
+    const signMesh = new THREE.Mesh(
+      signGeo,
+      new THREE.MeshBasicMaterial({ map: signTexture }),
+    );
+    signMesh.position.set(-1.55, 2.7, 0);
+    group.add(signMesh);
+  }
+
+  // Crate of coconuts on the ground beside the kiosk
+  const crateGeo = new THREE.BoxGeometry(0.7, 0.4, 0.7);
+  const crate = new THREE.Mesh(crateGeo, woodMat);
+  crate.position.set(0.6, 0.2, 0.8);
+  group.add(crate);
+
+  for (let i = 0; i < 4; i++) {
+    const crateCoco = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 5), cocoMat);
+    crateCoco.position.set(
+      0.6 + ((i % 2) - 0.5) * 0.25,
+      0.46,
+      0.8 + (Math.floor(i / 2) - 0.5) * 0.25,
+    );
+    group.add(crateCoco);
+  }
+
+  return { group, baseZ: 0 };
+}
+
+export function createCoconutPickupMesh(): THREE.Group {
+  const group = new THREE.Group();
+
+  const cocoMat = new THREE.MeshStandardMaterial({
+    color: 0x16a34a,
+    roughness: 0.5,
+    flatShading: true,
+  });
+  const coco = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 7), cocoMat);
+  coco.scale.set(1, 1.15, 1);
+  group.add(coco);
+
+  // Clipped top coconut opening with white coconut meat
+  const meatMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const meat = new THREE.Mesh(new THREE.CircleGeometry(0.12, 8), meatMat);
+  meat.rotation.x = -Math.PI / 2;
+  meat.position.y = 0.27;
+  group.add(meat);
+
+  // Straw
+  const strawMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
+  const straw = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.35, 6), strawMat);
+  straw.rotation.z = 0.35;
+  straw.position.set(-0.04, 0.4, 0);
+  group.add(straw);
+
+  // Hydration turquoise aura ring
+  const ringGeo = new THREE.RingGeometry(0.35, 0.45, 16);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0x38bdf8,
+    transparent: true,
+    opacity: 0.7,
+    side: THREE.DoubleSide,
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = -Math.PI / 2;
+  group.add(ring);
+
+  return group;
 }
 
 export interface WindsockRig {

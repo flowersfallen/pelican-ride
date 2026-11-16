@@ -26,6 +26,8 @@ import {
   createMilestoneMarkerRig,
   createViewpointPavilionRig,
   createBeachCampsiteRig,
+  createCoconutKioskRig,
+  createCoconutPickupMesh,
   createEveningStarMesh,
   createCrescentMoonMesh,
   createRumbleStripMesh,
@@ -34,6 +36,7 @@ import {
   createWindsockRig,
   createWhaleMesh,
   BeachCampsiteRig,
+  CoconutKioskRig,
   DolphinRig,
   LighthouseRig,
   MilestoneMarkerRig,
@@ -349,6 +352,12 @@ export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
     desc: '集齐海洋战利品五大珍宝（鱼、虾、海星、海草、探照灯），达成海角大满贯！',
     icon: '🌟',
   },
+  coconut_refresh: {
+    id: 'coconut_refresh',
+    title: '海岛椰青',
+    desc: '在沿海公路驿站品尝冰镇鲜椰，注入满额电解质与清爽极速！',
+    icon: '🥥',
+  },
 };
 
 export class PelicanScene {
@@ -407,6 +416,8 @@ export class PelicanScene {
   private rainbowPassed = false;
   private beachCampsites: BeachCampsiteRig[] = [];
   private passedCampsites = new Set<number>();
+  private coconutKiosks: CoconutKioskRig[] = [];
+  private coconutPickups: { group: THREE.Group; baseZ: number; collected: boolean }[] = [];
   private crabs: CrabRig[] = [];
   private trafficCones: TrafficConeRig[] = [];
   private windTurbines: WindTurbineRig[] = [];
@@ -991,6 +1002,21 @@ export class PelicanScene {
       this.scene.add(camp.group);
     }
 
+    // Coastal Coconut Kiosks & Fresh Coconut Drink Pickups (+X on right beach and shoulder)
+    const coconutZPositions = [-1350, -2350];
+    for (const z of coconutZPositions) {
+      const kiosk = createCoconutKioskRig();
+      kiosk.baseZ = z;
+      kiosk.group.position.set(ROAD_HALF_WIDTH + 3.8, 0, z);
+      this.coconutKiosks.push(kiosk);
+      this.scene.add(kiosk.group);
+
+      const pickupGroup = createCoconutPickupMesh();
+      pickupGroup.position.set(ROAD_HALF_WIDTH - 0.35, 0.85, z);
+      this.coconutPickups.push({ group: pickupGroup, baseZ: z, collected: false });
+      this.scene.add(pickupGroup);
+    }
+
     // Coastal Windsocks on the seaward railing (-X = -ROAD_HALF_WIDTH - 0.45)
     const windsockZPositions = [-85, -205, -325];
     for (const z of windsockZPositions) {
@@ -1571,6 +1597,18 @@ export class PelicanScene {
     const campsiteZPositions = [-680, -1580, -2480];
     this.beachCampsites.forEach((camp, idx) => {
       camp.group.position.set(ROAD_HALF_WIDTH + 3.2, 0, campsiteZPositions[idx] || -680);
+    });
+
+    const coconutZPositions = [-1350, -2350];
+    this.coconutKiosks.forEach((kiosk, idx) => {
+      kiosk.baseZ = coconutZPositions[idx] || -1350;
+      kiosk.group.position.set(ROAD_HALF_WIDTH + 3.8, 0, kiosk.baseZ);
+    });
+    this.coconutPickups.forEach((p, idx) => {
+      p.baseZ = coconutZPositions[idx] || -1350;
+      p.collected = false;
+      p.group.visible = true;
+      p.group.position.set(ROAD_HALF_WIDTH - 0.35, 0.85, p.baseZ);
     });
 
     const windsockZPositions = [-85, -205, -325];
@@ -3239,6 +3277,68 @@ export class PelicanScene {
       }
     }
 
+    // Coastal Coconut Kiosks & Fresh Coconut Drink Pickups
+    for (let k = 0; k < this.coconutKiosks.length; k++) {
+      const kiosk = this.coconutKiosks[k];
+      const pickup = this.coconutPickups[k];
+
+      if (pickup && !pickup.collected) {
+        pickup.group.rotation.y += dt * 3.2;
+        pickup.group.position.y = 0.85 + Math.sin(elapsedSec * 3.0 + k) * 0.12;
+
+        const distZ = Math.abs(this.playerZ - pickup.group.position.z);
+        const distX = Math.abs(this.playerX - pickup.group.position.x);
+        if (distZ < 1.8 && distX < 2.0) {
+          pickup.collected = true;
+          pickup.group.visible = false;
+          coastalAudio.playCoconutSip();
+          this.boostTimer = Math.max(this.boostTimer, 4.0);
+          this.speed += 6.0;
+          this.bannerText = '🥥 畅饮冰镇椰青 · 注入满满海岛活力！极速破风！';
+          this.bannerTimer = 3.0;
+          this.checkAchievement('coconut_refresh');
+          try {
+            navigator.vibrate?.([40, 25, 60]);
+          } catch {}
+
+          // Refreshing turquoise hydration droplet mist burst
+          const dropMat = new THREE.MeshBasicMaterial({
+            color: 0x38bdf8,
+            transparent: true,
+            opacity: 0.9,
+          });
+          for (let d = 0; d < 14; d++) {
+            const drop = new THREE.Mesh(new THREE.DodecahedronGeometry(0.12, 0), dropMat);
+            drop.position.set(
+              pickup.group.position.x + (Math.random() - 0.5) * 0.8,
+              pickup.group.position.y + (Math.random() - 0.5) * 0.8,
+              pickup.group.position.z + (Math.random() - 0.5) * 0.8,
+            );
+            this.scene.add(drop);
+            this.particles.push({
+              mesh: drop,
+              vel: new THREE.Vector3(
+                (Math.random() - 0.5) * 2.8,
+                1.5 + Math.random() * 2.5,
+                (Math.random() - 0.5) * 2.8,
+              ),
+              life: 0.9 + Math.random() * 0.5,
+            });
+          }
+        }
+      }
+
+      // Recycle kiosk & pickup when far behind
+      if (kiosk.group.position.z > this.playerZ + 65) {
+        kiosk.group.position.z -= 2 * 1000;
+        if (pickup) {
+          pickup.group.position.z = kiosk.group.position.z;
+          pickup.collected = false;
+          pickup.group.visible = true;
+        }
+      }
+    }
+
     // Coastal Windsocks Animation & Recycling
     for (let wsIdx = 0; wsIdx < this.windsocks.length; wsIdx++) {
       const ws = this.windsocks[wsIdx];
@@ -3605,6 +3705,18 @@ export class PelicanScene {
       this.camera.fov += (desiredFov - this.camera.fov) * Math.min(1, 4 * dt);
       this.camera.updateProjectionMatrix();
     }
+
+    // Dynamic Camera Banking into high-speed turns & drifts
+    const targetCamRoll = this.isDrifting
+      ? (this.input.left ? 0.045 : -0.045)
+      : -this.steerAngle * 0.024;
+    this.camera.rotation.z += (targetCamRoll - this.camera.rotation.z) * Math.min(1, 8.0 * dt);
+
+    // Subtle speed micro-vibration during supersonic boost (>52 km/h) or fever mode
+    if (this.speed > 14.5 || this.isFeverMode) {
+      this.camera.position.x += (Math.random() - 0.5) * 0.015;
+      this.camera.position.y += (Math.random() - 0.5) * 0.012;
+    }
   }
 
   private animatePelicanRig(
@@ -3614,6 +3726,11 @@ export class PelicanScene {
     elapsedSec: number,
     dt: number,
   ): void {
+    // Update live handlebar digital GPS cycling computer
+    const speedKmh = Math.round(speed * 3.6);
+    const cadenceRpm = Math.round(Math.min(135, 60 + (speed / 12) * 45));
+    rig.updateOdometer?.(speedKmh, cadenceRpm, this.boostTimer > 0);
+
     const wheelSpin = (speed / 0.44) * dt;
     rig.rearWheel.rotation.x -= wheelSpin;
     rig.frontWheel.rotation.x -= wheelSpin;

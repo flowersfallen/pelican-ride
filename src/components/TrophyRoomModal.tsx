@@ -38,6 +38,7 @@ const ALL_ACHIEVEMENT_IDS: AchievementId[] = [
   'century_rider',
   'bonfire_gatherer',
   'grand_tour_master',
+  'coconut_refresh',
 ];
 
 export function TrophyRoomModal({ hud, onClose }: TrophyRoomModalProps) {

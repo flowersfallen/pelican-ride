@@ -1575,6 +1575,54 @@ class CoastalAudioEngine {
       // Audio fallback
     }
   }
+
+  public playCoconutSip(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // Satisfying liquid gulp sounds
+      [0, 0.12].forEach((delay, idx) => {
+        const osc = this.ctx!.createOscillator();
+        const gain = this.ctx!.createGain();
+        osc.type = 'sine';
+        const startFreq = idx === 0 ? 340 : 380;
+        const endFreq = idx === 0 ? 190 : 220;
+        osc.frequency.setValueAtTime(startFreq, now + delay);
+        osc.frequency.exponentialRampToValueAtTime(endFreq, now + delay + 0.07);
+
+        gain.gain.setValueAtTime(0.001, now + delay);
+        gain.gain.linearRampToValueAtTime(0.14, now + delay + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.08);
+
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(now + delay);
+        osc.stop(now + delay + 0.09);
+      });
+
+      // Refreshing tropical sparkle chime
+      [1318.5, 1661.2, 1975.5, 2637.0].forEach((freq, idx) => {
+        const osc = this.ctx!.createOscillator();
+        const gain = this.ctx!.createGain();
+        const t = now + 0.22 + idx * 0.05;
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, t);
+
+        gain.gain.setValueAtTime(0.001, t);
+        gain.gain.linearRampToValueAtTime(0.08, t + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(t);
+        osc.stop(t + 0.4);
+      });
+    } catch {
+      // Audio fallback
+    }
+  }
 }
 
 export const coastalAudio = new CoastalAudioEngine();

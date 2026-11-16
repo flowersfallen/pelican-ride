@@ -36,7 +36,8 @@ export type AchievementId =
   | 'ocean_whale'
   | 'century_rider'
   | 'bonfire_gatherer'
-  | 'grand_tour_master';
+  | 'grand_tour_master'
+  | 'coconut_refresh';
 
 export type GraphicQuality = 'high' | 'battery_saver';
 
