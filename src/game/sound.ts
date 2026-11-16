@@ -1515,6 +1515,66 @@ class CoastalAudioEngine {
       // Audio fallback
     }
   }
+
+  public playRumbleStrip(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // 5 rapid tactile rumble braps simulating road rumble stripes under bike tires
+      for (let i = 0; i < 5; i++) {
+        const stripeTime = now + i * 0.038;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(85, stripeTime);
+        osc.frequency.exponentialRampToValueAtTime(45, stripeTime + 0.03);
+
+        gain.gain.setValueAtTime(0.001, stripeTime);
+        gain.gain.linearRampToValueAtTime(0.12, stripeTime + 0.008);
+        gain.gain.exponentialRampToValueAtTime(0.001, stripeTime + 0.035);
+
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(stripeTime);
+        osc.stop(stripeTime + 0.04);
+      }
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playPavilionBellEcho(tone?: string): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // Slapback echo off pavilion wooden rafters / columns (180ms delay, lower volume)
+      const echoDelay = 0.18;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(tone === 'conch' ? 440 : 2093.0, now + echoDelay);
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1600, now + echoDelay);
+
+      gain.gain.setValueAtTime(0.001, now + echoDelay);
+      gain.gain.linearRampToValueAtTime(0.035, now + echoDelay + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + echoDelay + 0.45);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.getDestination());
+      osc.start(now + echoDelay);
+      osc.stop(now + echoDelay + 0.5);
+    } catch {
+      // Audio fallback
+    }
+  }
 }
 
 export const coastalAudio = new CoastalAudioEngine();

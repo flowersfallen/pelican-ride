@@ -1416,6 +1416,95 @@ export function createEveningStarMesh(): THREE.Mesh {
   return mesh;
 }
 
+export function createCrescentMoonMesh(): THREE.Group {
+  const group = new THREE.Group();
+  const moonShape = new THREE.Shape();
+  // Outer arc
+  moonShape.absarc(0, 0, 2.6, -Math.PI / 2, Math.PI / 2, false);
+  // Inner arc subtracting to form crescent
+  moonShape.absarc(0.95, 0, 2.2, Math.PI / 2, -Math.PI / 2, true);
+
+  const extrudeSettings = {
+    depth: 0.35,
+    bevelEnabled: true,
+    bevelSegments: 2,
+    steps: 1,
+    bevelSize: 0.08,
+    bevelThickness: 0.08,
+  };
+
+  const geo = new THREE.ExtrudeGeometry(moonShape, extrudeSettings);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xfef08a, // Soft warm pale lunar yellow
+    transparent: true,
+    opacity: 0,
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.y = Math.PI * 0.15;
+  mesh.rotation.z = -Math.PI * 0.08;
+  group.add(mesh);
+
+  // Soft lunar halo glow
+  const haloGeo = new THREE.RingGeometry(2.5, 4.2, 24);
+  const haloMat = new THREE.MeshBasicMaterial({
+    color: 0x38bdf8,
+    transparent: true,
+    opacity: 0,
+    side: THREE.DoubleSide,
+  });
+  const halo = new THREE.Mesh(haloGeo, haloMat);
+  halo.position.z = -0.15;
+  group.add(halo);
+
+  group.position.set(-78, 52, -220);
+  return group;
+}
+
+export function createRumbleStripMesh(): THREE.Group {
+  const group = new THREE.Group();
+  const stripeMat = new THREE.MeshStandardMaterial({
+    color: 0xfacc15, // High-visibility highway yellow
+    roughness: 0.5,
+    flatShading: true,
+  });
+  const stripeGeo = new THREE.BoxGeometry(12.4, 0.06, 0.22);
+  // 5 parallel raised thermo-plastic rumble stripes
+  for (let i = 0; i < 5; i++) {
+    const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+    stripe.position.set(0, 0.03, (i - 2) * 0.55);
+    group.add(stripe);
+  }
+  return group;
+}
+
+export interface PerchedSeagullRig {
+  group: THREE.Group;
+  leftWing: THREE.Mesh;
+  rightWing: THREE.Mesh;
+  baseZ: number;
+  isFleeing: boolean;
+  fleeTimer: number;
+  flapPhase: number;
+}
+
+export function createPerchedSeagullMesh(): PerchedSeagullRig {
+  const rig = createSeagullMesh();
+  rig.group.scale.setScalar(0.85);
+  // Wings folded down at sides when perched
+  rig.leftWing.rotation.z = -0.45;
+  rig.rightWing.rotation.z = 0.45;
+  return {
+    group: rig.group,
+    leftWing: rig.leftWing,
+    rightWing: rig.rightWing,
+    baseZ: -35,
+    isFleeing: false,
+    fleeTimer: 0,
+    flapPhase: 0,
+  };
+}
+
 export function createRoadSignMesh(
   type: 'highway' | 'tsunami_evac' | 'scenic_route',
 ): THREE.Group {

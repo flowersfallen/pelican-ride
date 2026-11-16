@@ -27,6 +27,9 @@ import {
   createViewpointPavilionRig,
   createBeachCampsiteRig,
   createEveningStarMesh,
+  createCrescentMoonMesh,
+  createRumbleStripMesh,
+  createPerchedSeagullMesh,
   createRainbowRig,
   createWindsockRig,
   createWhaleMesh,
@@ -35,6 +38,7 @@ import {
   LighthouseRig,
   MilestoneMarkerRig,
   PelicanRig,
+  PerchedSeagullRig,
   RainbowRig,
   SeagullRig,
   TrafficConeRig,
@@ -386,8 +390,13 @@ export class PelicanScene {
   private contactShadow!: THREE.Mesh;
   private starfield!: THREE.Points;
   private eveningStar!: THREE.Mesh;
+  private crescentMoon!: THREE.Group;
+  private lunarReflectionMesh!: THREE.Mesh;
   private dolphins: DolphinRig[] = [];
   private whales: WhaleRig[] = [];
+  private perchedGulls: PerchedSeagullRig[] = [];
+  private rumbleStrips: THREE.Group[] = [];
+  private passedRumbleStrips = new Set<number>();
   private roadSigns: THREE.Group[] = [];
   private jumpRamps: THREE.Group[] = [];
   private milestoneMarkers: MilestoneMarkerRig[] = [];
@@ -880,6 +889,23 @@ export class PelicanScene {
     this.eveningStar = createEveningStarMesh();
     this.scene.add(this.eveningStar);
 
+    // Shimmering Crescent Moon in the deep coastal night sky
+    this.crescentMoon = createCrescentMoonMesh();
+    this.scene.add(this.crescentMoon);
+
+    // Lunar sea reflection ribbon on ocean surface
+    const lunarReflGeo = new THREE.PlaneGeometry(16, 90);
+    const lunarReflMat = new THREE.MeshBasicMaterial({
+      color: 0xfef08a,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
+    this.lunarReflectionMesh = new THREE.Mesh(lunarReflGeo, lunarReflMat);
+    this.lunarReflectionMesh.rotation.x = -Math.PI / 2;
+    this.lunarReflectionMesh.position.set(-58, 0.02, -180);
+    this.scene.add(this.lunarReflectionMesh);
+
     // Graceful Jumping Dolphins in deep coastal water
     for (let i = 0; i < 2; i++) {
       const dolphin = createDolphinMesh();
@@ -943,6 +969,12 @@ export class PelicanScene {
       pavilion.group.position.set(ROAD_HALF_WIDTH + 4.2, 0, vp.z);
       this.viewpointPavilions.push(pavilion);
       this.scene.add(pavilion.group);
+
+      // Thermo-plastic Rumble Strips placed 35m before viewpoint pavilion
+      const rumble = createRumbleStripMesh();
+      rumble.position.set(0, 0, vp.z + 35);
+      this.rumbleStrips.push(rumble);
+      this.scene.add(rumble);
     }
 
     // Coastal Rainbow Wonder (grand arch across the sea and coastal road)
@@ -967,6 +999,16 @@ export class PelicanScene {
       sock.group.position.set(-ROAD_HALF_WIDTH - 0.45, 0, z);
       this.windsocks.push(sock);
       this.scene.add(sock.group);
+    }
+
+    // Coastal Seawall Perched Seagulls (resting along seawall posts at -ROAD_HALF_WIDTH - 0.45)
+    const perchedZPositions = [-60, -180, -310];
+    for (const z of perchedZPositions) {
+      const gull = createPerchedSeagullMesh();
+      gull.baseZ = z;
+      gull.group.position.set(-ROAD_HALF_WIDTH - 0.45, 1.35, z);
+      this.perchedGulls.push(gull);
+      this.scene.add(gull.group);
     }
 
     // Beach Crabs on the sandy shore (+X)
@@ -1231,6 +1273,14 @@ export class PelicanScene {
     this.bellRingCount += 1;
     if (this.bellRingCount >= 10) {
       this.checkAchievement('bell_ringer');
+    }
+
+    // Viewpoint pavilion architectural bell slapback echo if nearby
+    for (const pavilion of this.viewpointPavilions) {
+      if (Math.abs(pavilion.group.position.z - this.playerZ) < 22) {
+        coastalAudio.playPavilionBellEcho(this.identity.bellTone);
+        break;
+      }
     }
 
     // Companion peloton answers the bell
@@ -1508,6 +1558,10 @@ export class PelicanScene {
     this.viewpointPavilions.forEach((pavilion, idx) => {
       pavilion.group.position.set(ROAD_HALF_WIDTH + 4.2, 0, viewpointDefs[idx]);
     });
+    this.passedRumbleStrips.clear();
+    this.rumbleStrips.forEach((rumble, idx) => {
+      rumble.position.set(0, 0, viewpointDefs[idx] + 35);
+    });
 
     this.rainbowPassed = false;
     this.rainbowRig.group.position.set(0, 0, this.playerZ - 320);
@@ -1526,6 +1580,17 @@ export class PelicanScene {
     if (this.eveningStar) {
       (this.eveningStar.material as THREE.MeshBasicMaterial).opacity = 0;
     }
+    const perchedZPositions = [-60, -180, -310];
+    this.perchedGulls.forEach((gull, idx) => {
+      gull.baseZ = this.playerZ + (perchedZPositions[idx] || -60);
+      gull.group.position.set(-ROAD_HALF_WIDTH - 0.45, 1.35, gull.baseZ);
+      gull.group.rotation.set(0, 0, 0);
+      gull.isFleeing = false;
+      gull.fleeTimer = 0;
+      gull.flapPhase = 0;
+      gull.leftWing.rotation.z = -0.45;
+      gull.rightWing.rotation.z = 0.45;
+    });
 
     this.whales.forEach((whale, idx) => {
       whale.isJumping = false;
@@ -2753,6 +2818,23 @@ export class PelicanScene {
     this.eveningStar.position.z = this.playerZ - 180;
     this.eveningStar.scale.setScalar(0.9 + Math.sin(elapsedSec * 2.5) * 0.18);
 
+    // Shimmering Crescent Moon & Lunar Reflection Ribbon
+    const targetMoonOpacity = !isThreat && this.timeOfDay === 'night' ? 0.95 : 0;
+    this.crescentMoon.children.forEach((child, idx) => {
+      const mat = (child as THREE.Mesh).material as THREE.MeshBasicMaterial;
+      if (mat) {
+        const target = idx === 1 ? targetMoonOpacity * 0.35 : targetMoonOpacity;
+        mat.opacity += (target - mat.opacity) * Math.min(1, 2 * dt);
+      }
+    });
+    this.crescentMoon.position.z = this.playerZ - 220;
+
+    const targetLunarRefl =
+      !isThreat && this.timeOfDay === 'night' ? 0.24 + Math.sin(elapsedSec * 1.8) * 0.06 : 0;
+    (this.lunarReflectionMesh.material as THREE.MeshBasicMaterial).opacity +=
+      (targetLunarRefl - (this.lunarReflectionMesh.material as THREE.MeshBasicMaterial).opacity) * Math.min(1, 2 * dt);
+    this.lunarReflectionMesh.position.z = this.playerZ - 180;
+
     // Bicycle Headlamp: removed from default passive state; only projects as an active power-up effect!
     const isHeadlightActive = this.headlightTimer > 0;
     if (this.playerRig.headlightBeam) {
@@ -3030,6 +3112,26 @@ export class PelicanScene {
       // Recycle viewpoint pavilion when far behind
       if (pavilion.group.position.z > this.playerZ + 75) {
         pavilion.group.position.z -= 4 * 800;
+      }
+    }
+
+    // Thermo-plastic Rumble Strips (approaching viewpoint pavilions)
+    for (let i = 0; i < this.rumbleStrips.length; i++) {
+      const rumble = this.rumbleStrips[i];
+      const distZ = Math.abs(this.playerZ - rumble.position.z);
+      const distX = Math.abs(this.playerX - rumble.position.x);
+      if (distZ < 1.8 && distX < ROAD_HALF_WIDTH && !this.passedRumbleStrips.has(i)) {
+        this.passedRumbleStrips.add(i);
+        coastalAudio.playRumbleStrip();
+        try {
+          navigator.vibrate?.([15, 20, 15, 20, 15]);
+        } catch {}
+      }
+
+      // Recycle rumble strip when far behind
+      if (rumble.position.z > this.playerZ + 75) {
+        rumble.position.z -= 4 * 800;
+        this.passedRumbleStrips.delete(i);
       }
     }
 
@@ -3321,6 +3423,49 @@ export class PelicanScene {
         } else if (gull.group.position.z < this.playerZ - 170) {
           gull.group.position.z = this.playerZ - 25;
         }
+      }
+    }
+
+    // Seawall Perched Seagulls: resting on posts, take flight when approached or alarmed by bell
+    for (let i = 0; i < this.perchedGulls.length; i++) {
+      const pg = this.perchedGulls[i];
+      const distToPlayer = Math.hypot(this.playerX - pg.group.position.x, this.playerZ - pg.group.position.z);
+
+      if (!pg.isFleeing && (distToPlayer < 9.0 || this.bellRingTimer > 0.45)) {
+        pg.isFleeing = true;
+        pg.fleeTimer = 0;
+        if (elapsedSec - this.lastSeagullSoundTime > 2.5) {
+          this.lastSeagullSoundTime = elapsedSec;
+          coastalAudio.playSeagullSquawk();
+        }
+      }
+
+      if (pg.isFleeing) {
+        pg.fleeTimer += dt;
+        pg.flapPhase += dt * 14.0;
+        pg.leftWing.rotation.z = 0.12 + Math.sin(pg.flapPhase) * 0.42;
+        pg.rightWing.rotation.z = -0.12 - Math.sin(pg.flapPhase) * 0.42;
+
+        // Take off upward and curve out over the ocean (-X)
+        pg.group.position.y += dt * 4.2;
+        pg.group.position.x -= dt * 6.5;
+        pg.group.position.z -= (this.speed * 0.4 + 5.0) * dt;
+        pg.group.rotation.y = -0.45;
+        pg.group.rotation.z = 0.22;
+      } else {
+        // Idling peacefully on seawall post with subtle bob
+        pg.group.position.y = 1.35 + Math.sin(elapsedSec * 2.0 + i) * 0.015;
+      }
+
+      // Recycle ahead when far behind player
+      if (pg.group.position.z > this.playerZ + 40) {
+        pg.isFleeing = false;
+        pg.fleeTimer = 0;
+        pg.baseZ = this.playerZ - 120 - Math.random() * 80;
+        pg.group.position.set(-ROAD_HALF_WIDTH - 0.45, 1.35, pg.baseZ);
+        pg.group.rotation.set(0, 0, 0);
+        pg.leftWing.rotation.z = -0.45;
+        pg.rightWing.rotation.z = 0.45;
       }
     }
 
