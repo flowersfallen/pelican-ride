@@ -1872,3 +1872,180 @@ export function createSeaTurtleMesh(): TurtleRig {
     startleTimer: 0,
   };
 }
+
+export interface MilestoneMarkerRig {
+  group: THREE.Group;
+  textMesh: THREE.Mesh;
+  badgeMesh: THREE.Mesh;
+  glowMesh: THREE.Mesh;
+  targetMeters: number;
+  label: string;
+}
+
+export function createMilestoneMarkerRig(meters: number, label: string): MilestoneMarkerRig {
+  const group = new THREE.Group();
+
+  // White stone concrete pillar
+  const stoneMat = new THREE.MeshStandardMaterial({
+    color: 0xf8fafc,
+    roughness: 0.85,
+    flatShading: true,
+  });
+  const redMat = new THREE.MeshStandardMaterial({
+    color: 0xef4444, // China Highway Red badge
+    roughness: 0.4,
+    flatShading: true,
+  });
+  const blackMat = new THREE.MeshStandardMaterial({
+    color: 0x0f172a,
+    roughness: 0.5,
+  });
+  const reflectorMat = new THREE.MeshBasicMaterial({
+    color: 0xfbbf24,
+  });
+
+  // Base foundation slab
+  const baseSlab = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 0.5), stoneMat);
+  baseSlab.position.y = 0.06;
+  baseSlab.castShadow = true;
+  baseSlab.receiveShadow = true;
+  group.add(baseSlab);
+
+  // Main vertical marker stone
+  const stonePillar = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.95, 0.32), stoneMat);
+  stonePillar.position.y = 0.55;
+  stonePillar.castShadow = true;
+  stonePillar.receiveShadow = true;
+  group.add(stonePillar);
+
+  // Rounded / Beveled Arch top cap
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.52, 8), stoneMat);
+  cap.rotation.z = Math.PI / 2;
+  cap.position.set(0, 1.02, 0);
+  cap.castShadow = true;
+  group.add(cap);
+
+  // Red top band (G228 Highway indicator)
+  const redBand = new THREE.Mesh(new THREE.BoxGeometry(0.53, 0.22, 0.33), redMat);
+  redBand.position.set(0, 0.85, 0);
+  group.add(redBand);
+
+  // Reflector cat-eye stud on top
+  const reflector = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.08, 6), reflectorMat);
+  reflector.rotation.x = Math.PI / 2;
+  reflector.position.set(0, 1.02, 0.17);
+  group.add(reflector);
+
+  // Dark number indicator plate on the road-facing side
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.35, 0.02), blackMat);
+  plate.position.set(0, 0.45, 0.17);
+  group.add(plate);
+
+  // Glowing status accent bar
+  const glowBar = new THREE.Mesh(
+    new THREE.BoxGeometry(0.32, 0.05, 0.025),
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+  );
+  glowBar.position.set(0, 0.35, 0.175);
+  group.add(glowBar);
+
+  return {
+    group,
+    textMesh: plate,
+    badgeMesh: redBand,
+    glowMesh: glowBar,
+    targetMeters: meters,
+    label,
+  };
+}
+
+export interface ViewpointPavilionRig {
+  group: THREE.Group;
+  lanternLight: THREE.Mesh;
+  windChime: THREE.Mesh;
+  viewpointName: string;
+}
+
+export function createViewpointPavilionRig(name: string): ViewpointPavilionRig {
+  const group = new THREE.Group();
+
+  const woodMat = new THREE.MeshStandardMaterial({
+    color: 0x78350f, // Warm rich timber
+    roughness: 0.75,
+    flatShading: true,
+  });
+  const roofMat = new THREE.MeshStandardMaterial({
+    color: 0x1e3a8a, // Coastal navy glazed pagoda tiles
+    roughness: 0.35,
+    flatShading: true,
+  });
+  const floorMat = new THREE.MeshStandardMaterial({
+    color: 0xa16207,
+    roughness: 0.9,
+    flatShading: true,
+  });
+  const whiteMat = new THREE.MeshStandardMaterial({
+    color: 0xf8fafc,
+    roughness: 0.4,
+  });
+
+  // Elevated timber deck platform
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.35, 4.2), floorMat);
+  deck.position.y = 0.45;
+  deck.castShadow = true;
+  deck.receiveShadow = true;
+  group.add(deck);
+
+  // Deck pilings
+  for (let px of [-1.8, 1.8]) {
+    for (let pz of [-1.8, 1.8]) {
+      const piling = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.6, 6), woodMat);
+      piling.position.set(px, 0.2, pz);
+      group.add(piling);
+    }
+  }
+
+  // 4 Main corner pillars
+  for (let px of [-1.7, 1.7]) {
+    for (let pz of [-1.7, 1.7]) {
+      const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 2.8, 8), woodMat);
+      pillar.position.set(px, 1.85, pz);
+      pillar.castShadow = true;
+      group.add(pillar);
+    }
+  }
+
+  // White seaside guardrails
+  const railGeoX = new THREE.BoxGeometry(3.6, 0.08, 0.06);
+  const railX1 = new THREE.Mesh(railGeoX, whiteMat);
+  railX1.position.set(0, 1.05, 1.8);
+  const railX2 = new THREE.Mesh(railGeoX, whiteMat);
+  railX2.position.set(0, 1.05, -1.8);
+  group.add(railX1, railX2);
+
+  // Pagoda eaves roof pyramid
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(3.4, 1.6, 4), roofMat);
+  roof.rotation.y = Math.PI / 4;
+  roof.position.y = 3.8;
+  roof.castShadow = true;
+  group.add(roof);
+
+  // Warm golden lantern hanging from center eave
+  const lanternMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+  const lantern = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), lanternMat);
+  lantern.position.set(0, 2.7, 0);
+  group.add(lantern);
+
+  // Subtle wind chime
+  const chimeMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+  const chime = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.35, 4), chimeMat);
+  chime.position.set(1.4, 2.6, 1.4);
+  group.add(chime);
+
+  return {
+    group,
+    lanternLight: lantern,
+    windChime: chime,
+    viewpointName: name,
+  };
+}

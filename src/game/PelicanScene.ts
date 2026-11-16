@@ -23,13 +23,17 @@ import {
   createTrafficConeMesh,
   createTsunamiWallMesh,
   createWindTurbineMesh,
+  createMilestoneMarkerRig,
+  createViewpointPavilionRig,
   DolphinRig,
   LighthouseRig,
+  MilestoneMarkerRig,
   PelicanRig,
   SeagullRig,
   TrafficConeRig,
   TsunamiRig,
   TurtleRig,
+  ViewpointPavilionRig,
   WindTurbineRig,
 } from './meshes';
 import {
@@ -209,6 +213,12 @@ export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
     desc: '在夜幕降临海滨时，领略海浪与车轮泛起的平潭蓝眼泪荧光微芒！',
     icon: '🌊',
   },
+  coastal_milestone: {
+    id: 'coastal_milestone',
+    title: '海道巡礼',
+    desc: '沿 G228 沿海公路打卡突破 1,000 米里程碑与海角观景台！',
+    icon: '🚩',
+  },
 };
 
 export class PelicanScene {
@@ -252,6 +262,10 @@ export class PelicanScene {
   private dolphins: DolphinRig[] = [];
   private roadSigns: THREE.Group[] = [];
   private jumpRamps: THREE.Group[] = [];
+  private milestoneMarkers: MilestoneMarkerRig[] = [];
+  private viewpointPavilions: ViewpointPavilionRig[] = [];
+  private passedMilestones = new Set<number>();
+  private passedViewpoints = new Set<string>();
   private crabs: CrabRig[] = [];
   private trafficCones: TrafficConeRig[] = [];
   private windTurbines: WindTurbineRig[] = [];
@@ -755,6 +769,30 @@ export class PelicanScene {
       this.scene.add(ramp);
     }
 
+    // G228 Coastal Highway Kilometer Stones (every 250m on the road right shoulder)
+    const milestoneMeters = [250, 500, 750, 1000, 1250, 1500, 1750, 2000];
+    for (const m of milestoneMeters) {
+      const label = m >= 1000 ? `G228 ${(m / 1000).toFixed(1)}KM` : `G228 ${m}M`;
+      const stone = createMilestoneMarkerRig(m, label);
+      stone.group.position.set(ROAD_HALF_WIDTH + 0.85, 0, -m);
+      this.milestoneMarkers.push(stone);
+      this.scene.add(stone.group);
+    }
+
+    // Coastal Scenic Viewpoint Pavilions (placed overlooking the ocean verge on right beach)
+    const viewpointDefs = [
+      { z: -450, name: '望潮湾观景台' },
+      { z: -1150, name: '月亮湾观景台' },
+      { z: -1950, name: '海角天涯观景台' },
+      { z: -2750, name: '星海落日阁' },
+    ];
+    for (const vp of viewpointDefs) {
+      const pavilion = createViewpointPavilionRig(vp.name);
+      pavilion.group.position.set(ROAD_HALF_WIDTH + 4.2, 0, vp.z);
+      this.viewpointPavilions.push(pavilion);
+      this.scene.add(pavilion.group);
+    }
+
     // Beach Crabs on the sandy shore (+X)
     for (let i = 0; i < 4; i++) {
       const crab = createCrabMesh();
@@ -1140,6 +1178,20 @@ export class PelicanScene {
       crab.baseX = ROAD_HALF_WIDTH + 2.2 + (idx % 2) * 1.8;
       crab.group.position.set(crab.baseX, 0, -32 - idx * 65);
       crab.fleeTimer = 0;
+    });
+
+    this.passedMilestones.clear();
+    this.passedViewpoints.clear();
+    const milestoneMeters = [250, 500, 750, 1000, 1250, 1500, 1750, 2000];
+    this.milestoneMarkers.forEach((marker, idx) => {
+      const m = milestoneMeters[idx];
+      marker.targetMeters = m;
+      marker.label = m >= 1000 ? `G228 ${(m / 1000).toFixed(1)}KM` : `G228 ${m}M`;
+      marker.group.position.set(ROAD_HALF_WIDTH + 0.85, 0, -m);
+    });
+    const viewpointDefs = [-450, -1150, -1950, -2750];
+    this.viewpointPavilions.forEach((pavilion, idx) => {
+      pavilion.group.position.set(ROAD_HALF_WIDTH + 4.2, 0, viewpointDefs[idx]);
     });
 
     this.spawnCompanions();
@@ -2376,6 +2428,52 @@ export class PelicanScene {
     for (const sign of this.roadSigns) {
       if (sign.position.z > this.playerZ + 35) {
         sign.position.z -= 4 * 65;
+      }
+    }
+
+    // G228 Coastal Highway Milestone & Scenic Viewpoint Proximity Checking
+    for (const marker of this.milestoneMarkers) {
+      const distZ = Math.abs(this.playerZ - marker.group.position.z);
+      if (distZ < 7.5 && !this.passedMilestones.has(marker.targetMeters)) {
+        this.passedMilestones.add(marker.targetMeters);
+        coastalAudio.playMilestoneChime();
+        this.bannerText = `🚩 掠过 ${marker.label} · 沿海风光迤逦`;
+        this.bannerTimer = 2.4;
+        try {
+          navigator.vibrate?.([30, 20, 40]);
+        } catch {}
+        if (marker.targetMeters >= 1000) {
+          this.checkAchievement('coastal_milestone');
+        }
+      }
+
+      // Recycle marker stone when it scrolls far behind player
+      if (marker.group.position.z > this.playerZ + 60) {
+        marker.group.position.z -= 8 * 250;
+        marker.targetMeters += 8 * 250;
+        marker.label =
+          marker.targetMeters >= 1000
+            ? `G228 ${(marker.targetMeters / 1000).toFixed(1)}KM`
+            : `G228 ${marker.targetMeters}M`;
+      }
+    }
+
+    for (const pavilion of this.viewpointPavilions) {
+      const distZ = Math.abs(this.playerZ - pavilion.group.position.z);
+      if (distZ < 13.5 && !this.passedViewpoints.has(pavilion.viewpointName)) {
+        this.passedViewpoints.add(pavilion.viewpointName);
+        coastalAudio.playMilestoneChime();
+        this.bannerText = `🏛️ 掠过【${pavilion.viewpointName}】· 听海涛拍岸`;
+        this.bannerTimer = 2.8;
+        try {
+          navigator.vibrate?.([40, 30, 50]);
+        } catch {}
+        this.checkAchievement('coastal_milestone');
+      }
+
+      // Recycle viewpoint pavilion when far behind
+      if (pavilion.group.position.z > this.playerZ + 75) {
+        pavilion.group.position.z -= 4 * 800;
       }
     }
 
