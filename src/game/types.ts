@@ -29,7 +29,8 @@ export type AchievementId =
   | 'seagull_escort'
   | 'blue_tears'
   | 'coastal_milestone'
-  | 'coastal_rainbow';
+  | 'coastal_rainbow'
+  | 'tailwind_rider';
 
 export type GraphicQuality = 'high' | 'battery_saver';
 
@@ -131,4 +132,6 @@ export interface GameHudState {
   bgmVolume: number;
   gear: number;
   tachometerPct: number;
+  windSpeedKmh: number;
+  windDirectionLabel: string;
 }

@@ -56,6 +56,8 @@ const INITIAL_HUD: GameHudState = {
   bgmVolume: 0.45,
   gear: 1,
   tachometerPct: 40,
+  windSpeedKmh: 14,
+  windDirectionLabel: '顺风',
   lifetimeStats: {
     totalDistanceMeters: 0,
     totalTsunamisSurvived: 0,

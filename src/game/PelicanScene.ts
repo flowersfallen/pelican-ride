@@ -27,6 +27,7 @@ import {
   createViewpointPavilionRig,
   createBeachCampsiteRig,
   createRainbowRig,
+  createWindsockRig,
   BeachCampsiteRig,
   DolphinRig,
   LighthouseRig,
@@ -38,6 +39,7 @@ import {
   TsunamiRig,
   TurtleRig,
   ViewpointPavilionRig,
+  WindsockRig,
   WindTurbineRig,
 } from './meshes';
 import {
@@ -229,6 +231,12 @@ export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
     desc: '渡过滔天巨浪狂澜，见证晴空跨海而立的七彩长虹！',
     icon: '🌈',
   },
+  tailwind_rider: {
+    id: 'tailwind_rider',
+    title: '顺风使舵',
+    desc: '借海滨呼啸顺风飞驰，车速突破极限！',
+    icon: '💨',
+  },
 };
 
 export class PelicanScene {
@@ -283,6 +291,10 @@ export class PelicanScene {
   private crabs: CrabRig[] = [];
   private trafficCones: TrafficConeRig[] = [];
   private windTurbines: WindTurbineRig[] = [];
+  private windsocks: WindsockRig[] = [];
+  private windSpeedKmh = 14;
+  private windAngleRad = 0.25;
+  private windDirectionLabel = '顺风';
   private skidMarks: THREE.Mesh[] = [];
   private rainRig!: { lineSegments: THREE.LineSegments; positions: Float32Array; count: number };
   private cameraMode: 'action' | 'chill' | 'drone' = 'action';
@@ -821,6 +833,16 @@ export class PelicanScene {
       this.scene.add(camp.group);
     }
 
+    // Coastal Windsocks on the seaward railing (-X = -ROAD_HALF_WIDTH - 0.45)
+    const windsockZPositions = [-85, -205, -325];
+    for (const z of windsockZPositions) {
+      const sock = createWindsockRig();
+      sock.baseZ = z;
+      sock.group.position.set(-ROAD_HALF_WIDTH - 0.45, 0, z);
+      this.windsocks.push(sock);
+      this.scene.add(sock.group);
+    }
+
     // Beach Crabs on the sandy shore (+X)
     for (let i = 0; i < 4; i++) {
       const crab = createCrabMesh();
@@ -862,23 +884,27 @@ export class PelicanScene {
   }
 
   private spawnSkidMark(x: number, z: number, intensity: number): void {
-    if (this.skidMarks.length >= 45) {
+    if (this.skidMarks.length >= 60) {
       const old = this.skidMarks.shift();
       if (old) this.scene.remove(old);
+      const old2 = this.skidMarks.shift();
+      if (old2) this.scene.remove(old2);
     }
-    const skidGeo = new THREE.PlaneGeometry(0.24, 0.95);
+    const skidGeo = new THREE.PlaneGeometry(0.12, 0.95);
     const skidMat = new THREE.MeshBasicMaterial({
       color: 0x0f172a,
       transparent: true,
       opacity: Math.min(0.55, 0.25 + intensity * 0.3),
       depthWrite: false,
     });
-    const mark = new THREE.Mesh(skidGeo, skidMat);
-    mark.rotation.x = -Math.PI / 2;
-    mark.rotation.z = this.steerAngle * 0.15;
-    mark.position.set(x, 0.014, z);
-    this.scene.add(mark);
-    this.skidMarks.push(mark);
+    for (const offset of [-0.08, 0.08]) {
+      const mark = new THREE.Mesh(skidGeo, skidMat);
+      mark.rotation.x = -Math.PI / 2;
+      mark.rotation.z = this.steerAngle * 0.18;
+      mark.position.set(x + offset, 0.014, z);
+      this.scene.add(mark);
+      this.skidMarks.push(mark);
+    }
   }
 
   private saveLifetimeStats(): void {
@@ -1230,6 +1256,11 @@ export class PelicanScene {
     const campsiteZPositions = [-680, -1580, -2480];
     this.beachCampsites.forEach((camp, idx) => {
       camp.group.position.set(ROAD_HALF_WIDTH + 3.2, 0, campsiteZPositions[idx] || -680);
+    });
+
+    const windsockZPositions = [-85, -205, -325];
+    this.windsocks.forEach((sock, idx) => {
+      sock.group.position.set(-ROAD_HALF_WIDTH - 0.45, 0, windsockZPositions[idx] || -85);
     });
 
     this.spawnCompanions();
@@ -1723,6 +1754,23 @@ export class PelicanScene {
     }
 
     // Determine target forward/reverse velocity
+    const isStormThreat = this.disasterPhase === 'warning' || this.disasterPhase === 'active';
+    this.windAngleRad = Math.sin(this.playerZ * 0.006) * 0.55;
+    const tailwindFactor = Math.cos(this.windAngleRad);
+    this.windSpeedKmh = Math.round(12 + Math.abs(Math.sin(elapsedSec * 0.25)) * 14 + (isStormThreat ? 16 : 0));
+    this.windDirectionLabel = isStormThreat
+      ? '台风狂澜'
+      : tailwindFactor > 0.9
+      ? '正顺风'
+      : tailwindFactor > 0.65
+      ? '侧顺风'
+      : '侧逆风';
+
+    const windBonus = !isStormThreat && tailwindFactor > 0.65 ? 1.4 : 0;
+    if (this.speed * 3.2 >= 52 && tailwindFactor > 0.65 && !isStormThreat) {
+      this.checkAchievement('tailwind_rider');
+    }
+
     const boostBonus =
       (this.boostTimer > 0 ? 7.5 : this.shieldTimer > 0 ? 2.5 : this.headlightTimer > 0 ? 3.5 : 0) +
       comboBonus;
@@ -1733,7 +1781,7 @@ export class PelicanScene {
     const wantsDrift =
       this.input.brake && (this.input.left || this.input.right) && (this.speed > 5.5 || this.isDrifting);
 
-    let targetSpeed = (tier.cruiseSpeed + boostBonus) * draftingBonus; // Auto-cruise with bonuses
+    let targetSpeed = (tier.cruiseSpeed + boostBonus + windBonus) * draftingBonus; // Auto-cruise with bonuses
     let accelRate = 7.5;
 
     if (wantsDrift && !this.isJumpingAir) {
@@ -2597,6 +2645,18 @@ export class PelicanScene {
       }
     }
 
+    // Coastal Windsocks Animation & Recycling
+    for (let wsIdx = 0; wsIdx < this.windsocks.length; wsIdx++) {
+      const ws = this.windsocks[wsIdx];
+      // Point in the direction the wind is blowing (swivel along Y)
+      ws.sockPivot.rotation.y = Math.PI * 0.5 + this.windAngleRad + Math.sin(elapsedSec * 3 + wsIdx) * 0.06;
+      ws.sockCloth.rotation.z = Math.sin(elapsedSec * 7 + wsIdx) * 0.07;
+
+      if (ws.group.position.z > this.playerZ + 45) {
+        ws.group.position.z -= 3 * 120;
+      }
+    }
+
     // Whoosh audio cue at high speed or during fish/shrimp boost
     if ((this.speed > 19 || this.boostTimer > 0) && elapsedSec - this.lastWhooshTime > 1.8) {
       this.lastWhooshTime = elapsedSec;
@@ -3043,6 +3103,8 @@ export class PelicanScene {
       bgmVolume: coastalAudio.getBgmVolume(),
       gear,
       tachometerPct,
+      windSpeedKmh: this.windSpeedKmh,
+      windDirectionLabel: this.windDirectionLabel,
     });
   }
 

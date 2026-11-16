@@ -10,6 +10,7 @@ import {
   Volume2,
   VolumeX,
   Waves,
+  Wind,
   Zap,
 } from 'lucide-react';
 import { GameHudState } from '../game/types';
@@ -173,6 +174,12 @@ export function GameHud({
                 <span className={hud.gradientPct >= 0 ? 'text-emerald-300' : 'text-sky-300'}>
                   {hud.gradientPct > 0 ? `+${hud.gradientPct}` : hud.gradientPct}%
                 </span>
+              </span>
+
+              <span className="flex items-center gap-1 text-teal-300" title="沿海实时风速与风向">
+                <Wind className="w-3 h-3 text-teal-300" />
+                <span>{hud.windSpeedKmh} <span className="text-[9px] text-slate-400">km/h</span></span>
+                <span className="text-[10px] text-teal-200/90 font-sans font-medium px-1 py-0.2 rounded bg-teal-500/20">{hud.windDirectionLabel}</span>
               </span>
             </div>
 

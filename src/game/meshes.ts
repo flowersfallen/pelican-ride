@@ -2220,3 +2220,76 @@ export function createBeachCampsiteRig(): BeachCampsiteRig {
     smokeTimer: 0,
   };
 }
+
+export interface WindsockRig {
+  group: THREE.Group;
+  sockPivot: THREE.Group;
+  sockCloth: THREE.Group;
+  baseZ: number;
+}
+
+export function createWindsockRig(): WindsockRig {
+  const group = new THREE.Group();
+
+  const metalMat = new THREE.MeshStandardMaterial({
+    color: 0x94a3b8,
+    metalness: 0.8,
+    roughness: 0.3,
+  });
+  const redMat = new THREE.MeshStandardMaterial({
+    color: 0xef4444, // Bright red
+    roughness: 0.7,
+    flatShading: true,
+  });
+  const whiteMat = new THREE.MeshStandardMaterial({
+    color: 0xf8fafc, // Clean white
+    roughness: 0.7,
+    flatShading: true,
+  });
+
+  // Vertical steel mast pole
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 3.8, 8), metalMat);
+  pole.position.y = 1.9;
+  pole.castShadow = true;
+  group.add(pole);
+
+  // Top swivel mount collar
+  const mount = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), metalMat);
+  mount.position.y = 3.8;
+  group.add(mount);
+
+  // Swiveling sock pivot
+  const sockPivot = new THREE.Group();
+  sockPivot.position.y = 3.75;
+
+  // Swivel hoop / collar ring
+  const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.02, 6, 12), metalMat);
+  hoop.rotation.y = Math.PI / 2;
+  sockPivot.add(hoop);
+
+  // Segmented red/white windsock cone
+  const sockCloth = new THREE.Group();
+  const segmentCount = 5;
+  const sockLength = 1.4;
+  const segLen = sockLength / segmentCount;
+
+  for (let i = 0; i < segmentCount; i++) {
+    const rTop = 0.18 * (1 - i * 0.14);
+    const rBottom = 0.18 * (1 - (i + 1) * 0.14);
+    const segGeo = new THREE.CylinderGeometry(rBottom, rTop, segLen, 8, 1, true);
+    const segMesh = new THREE.Mesh(segGeo, i % 2 === 0 ? redMat : whiteMat);
+    segMesh.rotation.z = Math.PI / 2;
+    segMesh.position.x = (i + 0.5) * segLen;
+    sockCloth.add(segMesh);
+  }
+
+  sockPivot.add(sockCloth);
+  group.add(sockPivot);
+
+  return {
+    group,
+    sockPivot,
+    sockCloth,
+    baseZ: -50,
+  };
+}
