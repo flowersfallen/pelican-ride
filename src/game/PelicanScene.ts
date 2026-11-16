@@ -25,10 +25,14 @@ import {
   createWindTurbineMesh,
   createMilestoneMarkerRig,
   createViewpointPavilionRig,
+  createBeachCampsiteRig,
+  createRainbowRig,
+  BeachCampsiteRig,
   DolphinRig,
   LighthouseRig,
   MilestoneMarkerRig,
   PelicanRig,
+  RainbowRig,
   SeagullRig,
   TrafficConeRig,
   TsunamiRig,
@@ -219,6 +223,12 @@ export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
     desc: '沿 G228 沿海公路打卡突破 1,000 米里程碑与海角观景台！',
     icon: '🚩',
   },
+  coastal_rainbow: {
+    id: 'coastal_rainbow',
+    title: '碧海虹桥',
+    desc: '渡过滔天巨浪狂澜，见证晴空跨海而立的七彩长虹！',
+    icon: '🌈',
+  },
 };
 
 export class PelicanScene {
@@ -266,6 +276,10 @@ export class PelicanScene {
   private viewpointPavilions: ViewpointPavilionRig[] = [];
   private passedMilestones = new Set<number>();
   private passedViewpoints = new Set<string>();
+  private rainbowRig!: RainbowRig;
+  private rainbowPassed = false;
+  private beachCampsites: BeachCampsiteRig[] = [];
+  private passedCampsites = new Set<number>();
   private crabs: CrabRig[] = [];
   private trafficCones: TrafficConeRig[] = [];
   private windTurbines: WindTurbineRig[] = [];
@@ -793,6 +807,20 @@ export class PelicanScene {
       this.scene.add(pavilion.group);
     }
 
+    // Coastal Rainbow Wonder (grand arch across the sea and coastal road)
+    this.rainbowRig = createRainbowRig();
+    this.rainbowRig.group.position.set(0, 0, -320);
+    this.scene.add(this.rainbowRig.group);
+
+    // Beachfront Campsites with warm flickering bonfires (+X = 8.8 on the beach)
+    const campsiteZPositions = [-680, -1580, -2480];
+    for (const z of campsiteZPositions) {
+      const camp = createBeachCampsiteRig();
+      camp.group.position.set(ROAD_HALF_WIDTH + 3.2, 0, z);
+      this.beachCampsites.push(camp);
+      this.scene.add(camp.group);
+    }
+
     // Beach Crabs on the sandy shore (+X)
     for (let i = 0; i < 4; i++) {
       const crab = createCrabMesh();
@@ -1192,6 +1220,16 @@ export class PelicanScene {
     const viewpointDefs = [-450, -1150, -1950, -2750];
     this.viewpointPavilions.forEach((pavilion, idx) => {
       pavilion.group.position.set(ROAD_HALF_WIDTH + 4.2, 0, viewpointDefs[idx]);
+    });
+
+    this.rainbowPassed = false;
+    this.rainbowRig.group.position.set(0, 0, this.playerZ - 320);
+    this.rainbowRig.opacity = 0;
+    this.rainbowRig.targetOpacity = 0;
+    this.passedCampsites.clear();
+    const campsiteZPositions = [-680, -1580, -2480];
+    this.beachCampsites.forEach((camp, idx) => {
+      camp.group.position.set(ROAD_HALF_WIDTH + 3.2, 0, campsiteZPositions[idx] || -680);
     });
 
     this.spawnCompanions();
@@ -2474,6 +2512,88 @@ export class PelicanScene {
       // Recycle viewpoint pavilion when far behind
       if (pavilion.group.position.z > this.playerZ + 75) {
         pavilion.group.position.z -= 4 * 800;
+      }
+    }
+
+    // Coastal Rainbow Wonder (dynamic arch across sky and sea)
+    const wantsRainbow =
+      !isThreat && (this.timeOfDay === 'sunset' || this.timeOfDay === 'noon' || this.tsunamisSurvived > 0);
+    this.rainbowRig.targetOpacity = wantsRainbow ? 0.68 : 0;
+    this.rainbowRig.opacity +=
+      (this.rainbowRig.targetOpacity - this.rainbowRig.opacity) * Math.min(1, 2.0 * dt);
+    this.rainbowRig.bands.forEach((band) => {
+      (band.material as THREE.MeshBasicMaterial).opacity = this.rainbowRig.opacity;
+    });
+
+    const distToRainbow = Math.abs(this.playerZ - this.rainbowRig.group.position.z);
+    if (distToRainbow < 14 && this.rainbowRig.opacity > 0.25 && !this.rainbowPassed) {
+      this.rainbowPassed = true;
+      this.boostTimer = Math.max(this.boostTimer, 4.0);
+      this.speed += 5.5;
+      coastalAudio.playRainbowChime();
+      this.bannerText = '🌈 穿越七彩跨海虹桥 · 迎着金芒飞驰！';
+      this.bannerTimer = 2.8;
+      try {
+        navigator.vibrate?.([40, 20, 60, 30, 80]);
+      } catch {}
+      this.checkAchievement('coastal_rainbow');
+
+      // Cascade of prismatic rainbow sparkles
+      const rainbowColors = [0xef4444, 0xf97316, 0xfacc15, 0x22c55e, 0x06b6d4, 0x3b82f6, 0x8b5cf6];
+      for (let k = 0; k < 24; k++) {
+        const pMat = new THREE.MeshBasicMaterial({
+          color: rainbowColors[k % rainbowColors.length],
+          transparent: true,
+          opacity: 0.95,
+        });
+        const pMesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.14, 0), pMat);
+        pMesh.position.set(
+          this.playerX + (Math.random() - 0.5) * 4.5,
+          2.5 + Math.random() * 4.5,
+          this.playerZ + (Math.random() - 0.5) * 5.0,
+        );
+        this.scene.add(pMesh);
+        this.particles.push({
+          mesh: pMesh,
+          vel: new THREE.Vector3(
+            (Math.random() - 0.5) * 3,
+            2.0 + Math.random() * 3.5,
+            (Math.random() - 0.5) * 3,
+          ),
+          life: 0.7,
+        });
+      }
+    }
+
+    if (this.rainbowRig.group.position.z > this.playerZ + 60) {
+      this.rainbowRig.group.position.z = this.playerZ - 420;
+      this.rainbowPassed = false;
+    }
+
+    // Beachfront Campsites & Bonfire Dynamics
+    for (let cIdx = 0; cIdx < this.beachCampsites.length; cIdx++) {
+      const camp = this.beachCampsites[cIdx];
+      // Bonfire flame flicker
+      camp.fireFlame.scale.y = 0.85 + Math.sin(elapsedSec * 16 + cIdx * 2) * 0.25;
+      camp.fireFlame.scale.x = 0.9 + Math.cos(elapsedSec * 14 + cIdx) * 0.15;
+      const lightTarget =
+        this.timeOfDay === 'night' ? 2.5 : this.timeOfDay === 'sunset' ? 1.6 : 0.6;
+      camp.fireLight.intensity = lightTarget + Math.sin(elapsedSec * 12 + cIdx) * 0.35;
+
+      const campDist = Math.abs(this.playerZ - camp.group.position.z);
+      const campKey = Math.round(camp.group.position.z);
+      if (campDist < 12 && !this.passedCampsites.has(campKey)) {
+        this.passedCampsites.add(campKey);
+        coastalAudio.playCampfireCrackle();
+        this.bannerText = '⛺ 掠过「海风星空露营地」· 晚风与篝火渐暖';
+        this.bannerTimer = 2.4;
+        try {
+          navigator.vibrate?.([25, 20, 35]);
+        } catch {}
+      }
+
+      if (camp.group.position.z > this.playerZ + 65) {
+        camp.group.position.z -= 3 * 900;
       }
     }
 

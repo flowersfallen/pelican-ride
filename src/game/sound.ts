@@ -1171,6 +1171,56 @@ class CoastalAudioEngine {
       // Audio fallback
     }
   }
+
+  public playRainbowChime(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // Dreamy ethereal celestial harp arpeggio: C6, E6, G6, B6, C7, E7
+      [1046.5, 1318.5, 1567.98, 1975.53, 2093.0, 2637.0].forEach((freq, idx) => {
+        const osc = this.ctx!.createOscillator();
+        const gain = this.ctx!.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+        gain.gain.setValueAtTime(0.001, now + idx * 0.06);
+        gain.gain.linearRampToValueAtTime(0.06, now + idx * 0.06 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.6);
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(now + idx * 0.06);
+        osc.stop(now + idx * 0.06 + 0.65);
+      });
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playCampfireCrackle(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      for (let i = 0; i < 3; i++) {
+        const delay = Math.random() * 0.18;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140 + Math.random() * 280, now + delay);
+        osc.frequency.exponentialRampToValueAtTime(40, now + delay + 0.04);
+        gain.gain.setValueAtTime(0.04, now + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.05);
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(now + delay);
+        osc.stop(now + delay + 0.06);
+      }
+    } catch {
+      // Audio fallback
+    }
+  }
 }
 
 export const coastalAudio = new CoastalAudioEngine();

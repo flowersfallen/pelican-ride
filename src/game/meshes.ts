@@ -2049,3 +2049,174 @@ export function createViewpointPavilionRig(name: string): ViewpointPavilionRig {
     viewpointName: name,
   };
 }
+
+export interface RainbowRig {
+  group: THREE.Group;
+  bands: THREE.Mesh[];
+  opacity: number;
+  targetOpacity: number;
+}
+
+export function createRainbowRig(): RainbowRig {
+  const group = new THREE.Group();
+  const bands: THREE.Mesh[] = [];
+
+  // 7 spectral colors: Red, Orange, Yellow, Green, Cyan, Blue, Violet
+  const colors = [
+    0xef4444, // Red
+    0xf97316, // Orange
+    0xfacc15, // Yellow
+    0x22c55e, // Green
+    0x06b6d4, // Cyan
+    0x3b82f6, // Blue
+    0x8b5cf6, // Violet
+  ];
+
+  const baseRadius = 38;
+  const bandThickness = 0.55;
+  const segments = 48;
+
+  // Build curved half-torus rainbow arc
+  colors.forEach((col, idx) => {
+    const r = baseRadius - idx * bandThickness;
+    const geo = new THREE.TorusGeometry(r, bandThickness * 0.48, 6, segments, Math.PI);
+    const mat = new THREE.MeshBasicMaterial({
+      color: col,
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.y = -3.0; // Anchored slightly below ground/sea level
+    group.add(mesh);
+    bands.push(mesh);
+  });
+
+  return {
+    group,
+    bands,
+    opacity: 0,
+    targetOpacity: 0,
+  };
+}
+
+export interface BeachCampsiteRig {
+  group: THREE.Group;
+  fireFlame: THREE.Mesh;
+  fireLight: THREE.PointLight;
+  smokeTimer: number;
+}
+
+export function createBeachCampsiteRig(): BeachCampsiteRig {
+  const group = new THREE.Group();
+
+  const canvasMat = new THREE.MeshStandardMaterial({
+    color: 0xfef08a, // Warm cream canvas
+    roughness: 0.9,
+    flatShading: true,
+  });
+  const tentMat2 = new THREE.MeshStandardMaterial({
+    color: 0x0284c7, // Coastal azure tent
+    roughness: 0.85,
+    flatShading: true,
+  });
+  const woodMat = new THREE.MeshStandardMaterial({
+    color: 0x78350f,
+    roughness: 0.8,
+  });
+  const stoneMat = new THREE.MeshStandardMaterial({
+    color: 0x64748b,
+    roughness: 0.9,
+    flatShading: true,
+  });
+  const charcoalMat = new THREE.MeshStandardMaterial({
+    color: 0x1e293b,
+    roughness: 0.95,
+  });
+
+  // Main A-frame Tent
+  const tent1 = new THREE.Group();
+  const tentPrism = new THREE.Mesh(new THREE.ConeGeometry(1.8, 2.2, 4), canvasMat);
+  tentPrism.rotation.y = Math.PI / 4;
+  tentPrism.position.y = 1.1;
+  tentPrism.scale.set(1.1, 1, 1.6);
+  tentPrism.castShadow = true;
+  tent1.add(tentPrism);
+
+  // Tent wooden ridge pole
+  const ridgePole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 3.2, 6), woodMat);
+  ridgePole.rotation.x = Math.PI / 2;
+  ridgePole.position.set(0, 2.2, 0);
+  tent1.add(ridgePole);
+  tent1.position.set(-1.8, 0, 0.8);
+  group.add(tent1);
+
+  // Second smaller popup dome tent
+  const tent2 = new THREE.Mesh(new THREE.SphereGeometry(1.1, 6, 5, 0, Math.PI * 2, 0, Math.PI * 0.5), tentMat2);
+  tent2.position.set(2.2, 0, -1.2);
+  tent2.scale.set(1.2, 1, 1.2);
+  tent2.castShadow = true;
+  group.add(tent2);
+
+  // Stone Fire Pit Ring
+  const firePit = new THREE.Group();
+  const stoneCount = 8;
+  for (let i = 0; i < stoneCount; i++) {
+    const angle = (i / stoneCount) * Math.PI * 2;
+    const stone = new THREE.Mesh(new THREE.DodecahedronGeometry(0.18, 0), stoneMat);
+    stone.position.set(Math.cos(angle) * 0.72, 0.1, Math.sin(angle) * 0.72);
+    firePit.add(stone);
+  }
+
+  // Charcoal base
+  const charcoal = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.08, 8), charcoalMat);
+  charcoal.position.y = 0.04;
+  firePit.add(charcoal);
+
+  // Crossing campfire logs
+  for (let angle of [0.3, 1.4, 2.5]) {
+    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.95, 6), woodMat);
+    log.rotation.z = Math.PI / 2;
+    log.rotation.y = angle;
+    log.position.y = 0.12;
+    firePit.add(log);
+  }
+
+  // Jumping bonfire flame
+  const flameMat = new THREE.MeshBasicMaterial({
+    color: 0xf97316,
+    transparent: true,
+    opacity: 0.95,
+  });
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.75, 6), flameMat);
+  flame.position.y = 0.42;
+  firePit.add(flame);
+
+  // Warm glowing point light
+  const fireLight = new THREE.PointLight(0xf59e0b, 1.8, 12, 1.5);
+  fireLight.position.set(0, 0.65, 0);
+  firePit.add(fireLight);
+
+  firePit.position.set(0, 0, 0);
+  group.add(firePit);
+
+  // Camping beach folding chair
+  const chair = new THREE.Group();
+  const seatMat = new THREE.MeshStandardMaterial({ color: 0x059669, roughness: 0.8 });
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.05, 0.65), seatMat);
+  seat.position.y = 0.45;
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.6, 0.05), seatMat);
+  back.position.set(0, 0.72, -0.3);
+  chair.add(seat, back);
+  chair.position.set(0.2, 0, 2.1);
+  chair.rotation.y = -Math.PI * 0.85;
+  group.add(chair);
+
+  return {
+    group,
+    fireFlame: flame,
+    fireLight,
+    smokeTimer: 0,
+  };
+}
