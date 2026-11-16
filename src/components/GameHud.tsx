@@ -202,6 +202,37 @@ export function GameHud({
                 {hud.tachometerPct}%
               </span>
             </div>
+
+            {/* GPS Coastal Elevation Profile (ClimbPro Style) */}
+            <div className="mt-1 flex items-center gap-1.5" title="沿海公路起伏海拔剖面 (ClimbPro)">
+              <span className="text-[9px] font-mono text-slate-400">ELEV</span>
+              <div className="h-3 flex-1 rounded bg-black/30 px-1 py-0.5 relative overflow-hidden flex items-end">
+                <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 20">
+                  <path
+                    d={`M 0 16 Q 25 ${12 - Math.sin(hud.distanceMeters * 0.02) * 6} 50 ${10 + Math.cos(hud.distanceMeters * 0.015) * 6} T 100 14 L 100 20 L 0 20 Z`}
+                    fill="rgba(56, 189, 248, 0.28)"
+                  />
+                  <path
+                    d={`M 0 16 Q 25 ${12 - Math.sin(hud.distanceMeters * 0.02) * 6} 50 ${10 + Math.cos(hud.distanceMeters * 0.015) * 6} T 100 14`}
+                    fill="none"
+                    stroke="#38bdf8"
+                    strokeWidth="1.2"
+                  />
+                  {/* Rider altitude marker dot */}
+                  <circle
+                    cx="25"
+                    cy={12 - Math.sin(hud.distanceMeters * 0.02) * 6}
+                    r="2.2"
+                    fill="#fde047"
+                    stroke="#0f172a"
+                    strokeWidth="0.8"
+                  />
+                </svg>
+              </div>
+              <span className="font-mono text-[9px] text-emerald-300">
+                {Math.round(8 + Math.sin(hud.distanceMeters * 0.008) * 6 + hud.distanceMeters * 0.002)}m
+              </span>
+            </div>
           </div>
 
           {/* Right: Quick Controls & Link Back to Timeline */}

@@ -462,6 +462,15 @@ class CoastalAudioEngine {
     }
   }
 
+  public updateOceanProximity(playerX: number): void {
+    if (!this.surfGain || !this.ctx || this.muted) return;
+    const proximityNorm = Math.max(0, Math.min(1, (-playerX + 5.0) / 10.0));
+    const targetGain = (0.04 + proximityNorm * 0.05) * this.masterVolume;
+    try {
+      this.surfGain.gain.setValueAtTime(targetGain, this.ctx.currentTime);
+    } catch {}
+  }
+
   public playWhoosh(): void {
     if (this.muted) return;
     this.unlock();

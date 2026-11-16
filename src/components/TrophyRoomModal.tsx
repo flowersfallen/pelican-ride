@@ -35,6 +35,7 @@ const ALL_ACHIEVEMENT_IDS: AchievementId[] = [
   'twilight_dreamer',
   'peloton_spirit',
   'ocean_whale',
+  'century_rider',
 ];
 
 export function TrophyRoomModal({ hud, onClose }: TrophyRoomModalProps) {

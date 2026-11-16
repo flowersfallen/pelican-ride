@@ -327,6 +327,12 @@ export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
     desc: '在浩瀚远海见证抹香巨鲸破浪跃出与壮阔喷泉！',
     icon: '🐋',
   },
+  century_rider: {
+    id: 'century_rider',
+    title: '百里破风',
+    desc: '沿 G228 沿海公路突破 3,000 米长途巡礼，座驾登顶【海角传说】！',
+    icon: '🏆',
+  },
 };
 
 export class PelicanScene {
@@ -2278,6 +2284,9 @@ export class PelicanScene {
     if (distanceMeters >= 2000 && (this.timeOfDay === 'sunset' || this.timeOfDay === 'night')) {
       this.checkAchievement('twilight_dreamer');
     }
+    if (distanceMeters >= 3000) {
+      this.checkAchievement('century_rider');
+    }
 
     // Time-of-Day Cycling (Noon -> Sunset -> Night -> Dawn)
     const cycleMeters = distanceMeters % 3200;
@@ -2730,6 +2739,7 @@ export class PelicanScene {
       this.roadMat.roughness += (targetRoughness - this.roadMat.roughness) * Math.min(1, 2.5 * dt);
       this.roadMat.metalness += (targetMetalness - this.roadMat.metalness) * Math.min(1, 2.5 * dt);
     }
+    coastalAudio.updateOceanProximity(this.playerX);
 
     if (isWetRoad && Math.abs(this.speed) > 10 && Math.random() < 0.25) {
       const sprayMat = new THREE.MeshBasicMaterial({ color: 0xc7d2fe, transparent: true, opacity: 0.65 });
