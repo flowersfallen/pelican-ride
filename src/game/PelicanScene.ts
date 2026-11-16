@@ -78,6 +78,75 @@ interface CompanionEntity {
   z: number;
   speedOffset: number;
   pedalPhase: number;
+  speechSprite?: THREE.Sprite;
+  speechTimer?: number;
+  speechCanvas?: HTMLCanvasElement;
+  speechCtx?: CanvasRenderingContext2D | null;
+  speechTexture?: THREE.CanvasTexture;
+}
+
+function drawSpeechBubbleOnCanvas(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  texture: THREE.CanvasTexture,
+  text: string,
+): void {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const w = canvas.width;
+  const h = canvas.height;
+  const pad = 10;
+  const bubbleH = h - 36;
+  const r = 20;
+
+  // Background rounded box with subtle drop shadow
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 6;
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+  ctx.beginPath();
+  ctx.moveTo(pad + r, pad);
+  ctx.lineTo(w - pad - r, pad);
+  ctx.quadraticCurveTo(w - pad, pad, w - pad, pad + r);
+  ctx.lineTo(w - pad, bubbleH - r);
+  ctx.quadraticCurveTo(w - pad, bubbleH, w - pad - r, bubbleH);
+  ctx.lineTo(pad + r, bubbleH);
+  ctx.quadraticCurveTo(pad, bubbleH, pad, bubbleH - r);
+  ctx.lineTo(pad, pad + r);
+  ctx.quadraticCurveTo(pad, pad, pad + r, pad);
+  ctx.closePath();
+  ctx.fill();
+
+  // Vibrant cyan border
+  ctx.shadowColor = 'transparent';
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // Pointer tail pointing down towards pelican rider
+  const tailX = w * 0.5;
+  const tailY = bubbleH;
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+  ctx.beginPath();
+  ctx.moveTo(tailX - 16, tailY - 1);
+  ctx.lineTo(tailX, tailY + 28);
+  ctx.lineTo(tailX + 16, tailY - 1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // Text label
+  ctx.fillStyle = '#f8fafc';
+  ctx.font =
+    'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, w * 0.5, (pad + bubbleH) * 0.5);
+
+  ctx.restore();
+  texture.needsUpdate = true;
 }
 
 interface PopParticle {
@@ -244,6 +313,12 @@ export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
     desc: '在金色晚霞与微风中静享海滨慢骑，突破 2,000 米里程！',
     icon: '✨',
   },
+  peloton_spirit: {
+    id: 'peloton_spirit',
+    title: '车队同心',
+    desc: '与同行车队完成气流破风与铃声互动，并肩穿越海风！',
+    icon: '🚴‍♂️',
+  },
 };
 
 export class PelicanScene {
@@ -360,6 +435,8 @@ export class PelicanScene {
   private isDrafting = false;
   private draftingTimer = 0;
   private lastDraftingSoundTime = 0;
+  private lastDraftingSpeechTime = -999;
+  private pelotonInteractionCount = 0;
   private isFeverMode = false;
   private isPhotoMode = false;
   private photoCameraPreset: 'hero' | 'wide' | 'follow' | 'low' = 'hero';
@@ -937,7 +1014,10 @@ export class PelicanScene {
   }
 
   private spawnCompanions(): void {
-    this.companions.forEach((c) => this.scene.remove(c.rig.group));
+    this.companions.forEach((c) => {
+      if (c.speechTexture) c.speechTexture.dispose();
+      this.scene.remove(c.rig.group);
+    });
     this.companions = [];
 
     const lanePresets = [-3.9, -1.2, 3.8];
@@ -947,6 +1027,25 @@ export class PelicanScene {
       const rig = createPelicanRiderMesh(ghostIdentity, true);
       const z = this.playerZ + offsets[i];
       rig.group.position.set(lanePresets[i], 0, z);
+
+      // Create speech bubble sprite for companion
+      const bubbleCanvas = document.createElement('canvas');
+      bubbleCanvas.width = 384;
+      bubbleCanvas.height = 160;
+      const bubbleCtx = bubbleCanvas.getContext('2d');
+      const bubbleTexture = new THREE.CanvasTexture(bubbleCanvas);
+      bubbleTexture.minFilter = THREE.LinearFilter;
+      const bubbleMat = new THREE.SpriteMaterial({
+        map: bubbleTexture,
+        transparent: true,
+        depthTest: false,
+      });
+      const speechSprite = new THREE.Sprite(bubbleMat);
+      speechSprite.scale.set(3.8, 1.6, 1);
+      speechSprite.position.set(0, 3.3, 0);
+      speechSprite.visible = false;
+      rig.group.add(speechSprite);
+
       this.scene.add(rig.group);
       this.companions.push({
         rig,
@@ -954,6 +1053,52 @@ export class PelicanScene {
         z,
         speedOffset: (i - 1) * 0.45,
         pedalPhase: Math.random() * Math.PI * 2,
+        speechSprite,
+        speechTimer: 0,
+        speechCanvas: bubbleCanvas,
+        speechCtx: bubbleCtx,
+        speechTexture: bubbleTexture,
+      });
+    }
+  }
+
+  private showCompanionSpeech(comp: CompanionEntity, text: string, duration = 3.5): void {
+    if (!comp.speechCanvas || !comp.speechCtx || !comp.speechTexture || !comp.speechSprite) return;
+    drawSpeechBubbleOnCanvas(comp.speechCanvas, comp.speechCtx, comp.speechTexture, text);
+    comp.speechSprite.visible = true;
+    comp.speechTimer = duration;
+  }
+
+  private spawnFireworkBurst(
+    x: number,
+    y: number,
+    z: number,
+    palette = [0xf43f5e, 0xfbbf24, 0x38bdf8, 0xa855f7, 0x34d399, 0xfb923c],
+  ): void {
+    const geom = new THREE.SphereGeometry(0.12, 6, 6);
+    const count = 28;
+    for (let i = 0; i < count; i++) {
+      const color = palette[Math.floor(Math.random() * palette.length)];
+      const mat = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.95,
+      });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.set(x, y, z);
+      this.scene.add(mesh);
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(Math.random() * 2 - 1);
+      const speed = 4.5 + Math.random() * 6.5;
+      const vel = new THREE.Vector3(
+        Math.sin(phi) * Math.cos(theta) * speed,
+        Math.cos(phi) * speed * 0.7 + 2.5,
+        Math.sin(phi) * Math.sin(theta) * speed,
+      );
+      this.particles.push({
+        mesh,
+        vel,
+        life: 0.85 + Math.random() * 0.45,
       });
     }
   }
@@ -1022,6 +1167,32 @@ export class PelicanScene {
     this.bellRingCount += 1;
     if (this.bellRingCount >= 10) {
       this.checkAchievement('bell_ringer');
+    }
+
+    // Companion peloton answers the bell
+    let nearestComp: CompanionEntity | null = null;
+    let minCompDist = 999;
+    for (const comp of this.companions) {
+      const dz = Math.abs(comp.z - this.playerZ);
+      if (dz < minCompDist) {
+        minCompDist = dz;
+        nearestComp = comp;
+      }
+    }
+    if (nearestComp && minCompDist < 45) {
+      const bellReplies = [
+        '叮铃铃~ 一起冲！🚴‍♂️',
+        '收到！保持队形！💨',
+        '好动听的清脆车铃！🔔',
+        '海风正爽，跟紧大部队！🌊',
+        '同心破风，加速前进！⚡',
+      ];
+      const reply = bellReplies[Math.floor(Math.random() * bellReplies.length)];
+      this.showCompanionSpeech(nearestComp, reply, 3.2);
+      this.pelotonInteractionCount += 1;
+      if (this.pelotonInteractionCount >= 3) {
+        this.checkAchievement('peloton_spirit');
+      }
     }
 
     // Scuttle crabs when bell sounds nearby
@@ -1205,6 +1376,8 @@ export class PelicanScene {
     this.headlightTimer = 0;
     this.isGameOver = false;
     this.tsunamisSurvived = 0;
+    this.pelotonInteractionCount = 0;
+    this.lastDraftingSpeechTime = -999;
     this.pickups = { fish: 0, shrimp: 0, starfish: 0, seaweed: 0, lantern: 0 };
     this.bannerText = '全新旅程开启 · 海风轻拂';
     this.bannerTimer = 2.6;
@@ -1303,6 +1476,15 @@ export class PelicanScene {
     coastalAudio.startSiren();
     coastalAudio.setBgmMode('warning');
     this.spawnWaveCollectiblesBatch(5);
+
+    const warnAlerts = [
+      '巨浪来啦！快猛踩！🌊',
+      '抓紧车把！全速冲刺！⚡',
+      '别回头！冲上高地！🚴💨',
+    ];
+    this.companions.forEach((comp, idx) => {
+      this.showCompanionSpeech(comp, warnAlerts[idx % warnAlerts.length], 4.2);
+    });
   }
 
   private enterActiveTsunami(): void {
@@ -1332,6 +1514,22 @@ export class PelicanScene {
     this.checkAchievement('coastal_melody');
     coastalAudio.stopWaveRoar();
     coastalAudio.startCalmSurf();
+
+    const cheerAlerts = [
+      '呼~ 成功甩开巨浪！太棒啦！🎉',
+      '安然无恙！海边夕阳真美~ ☀️',
+      '车队无敌！继续飞驰！✨',
+    ];
+    this.companions.forEach((comp, idx) => {
+      this.showCompanionSpeech(comp, cheerAlerts[idx % cheerAlerts.length], 3.8);
+    });
+    // Celebratory fireworks over the sea
+    this.spawnFireworkBurst(this.playerX - 6, 13, this.playerZ - 18);
+    coastalAudio.playFirework();
+    setTimeout(() => {
+      this.spawnFireworkBurst(this.playerX + 5, 14, this.playerZ - 22);
+      coastalAudio.playFirework();
+    }, 450);
   }
 
   private spawnWaveCollectiblesBatch(count: number): void {
@@ -1718,6 +1916,21 @@ export class PelicanScene {
       if (elapsedSec - this.lastDraftingSoundTime > 1.2) {
         this.lastDraftingSoundTime = elapsedSec;
         coastalAudio.playDraftingWhoosh();
+      }
+      if (elapsedSec - this.lastDraftingSpeechTime > 8.0 && draftingCompanion) {
+        this.lastDraftingSpeechTime = elapsedSec;
+        const draftReplies = [
+          '破风交给我！跟紧啦~ 🚴💨',
+          '借我的破风气流冲刺吧！⚡',
+          '完美尾流！一起穿透海风！🌀',
+          '贴紧我！能省下不少体力！🌬️',
+        ];
+        const reply = draftReplies[Math.floor(Math.random() * draftReplies.length)];
+        this.showCompanionSpeech(draftingCompanion, reply, 3.0);
+        this.pelotonInteractionCount += 1;
+        if (this.pelotonInteractionCount >= 3) {
+          this.checkAchievement('peloton_spirit');
+        }
       }
       // Aerodynamic cyan slipstream ribbon particle
       if (Math.random() < 0.45 && draftingCompanion) {
@@ -2558,6 +2771,18 @@ export class PelicanScene {
         if (marker.targetMeters >= 1000) {
           this.checkAchievement('coastal_milestone');
         }
+        if (marker.targetMeters >= 1000 && marker.targetMeters % 1000 === 0) {
+          this.spawnFireworkBurst(marker.group.position.x - 5, 14, marker.group.position.z - 12);
+          coastalAudio.playFirework();
+          if (this.companions.length > 0) {
+            const leadComp = this.companions[0];
+            this.showCompanionSpeech(
+              leadComp,
+              `突破 ${(marker.targetMeters / 1000).toFixed(0)} 公里！太帅了！🏆`,
+              3.5,
+            );
+          }
+        }
       }
 
       // Recycle marker stone when it scrolls far behind player
@@ -2876,6 +3101,14 @@ export class PelicanScene {
       comp.rig.frontWheel.rotation.x -= compSpeed * dt * 2.1;
       comp.rig.crankGroup.rotation.x = comp.pedalPhase;
       comp.rig.scarfTail.rotation.y = Math.sin(elapsedSec * 7 + idx) * 0.2;
+
+      // Update speech bubble countdown
+      if (comp.speechTimer && comp.speechTimer > 0) {
+        comp.speechTimer -= dt;
+        if (comp.speechTimer <= 0 && comp.speechSprite) {
+          comp.speechSprite.visible = false;
+        }
+      }
     });
 
     // Collectible spawning & pickup detection
@@ -3168,6 +3401,9 @@ export class PelicanScene {
     coastalAudio.stopSiren();
     coastalAudio.stopWaveRoar();
     coastalAudio.stopCalmSurf();
+    this.companions.forEach((c) => {
+      if (c.speechTexture) c.speechTexture.dispose();
+    });
     this.renderer.dispose();
     if (this.renderer.domElement.parentElement === this.container) {
       this.container.removeChild(this.renderer.domElement);

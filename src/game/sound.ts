@@ -1228,6 +1228,59 @@ class CoastalAudioEngine {
       // Audio fallback
     }
   }
+
+  public playFirework(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // Rising whistle rocket
+      const rocketOsc = this.ctx.createOscillator();
+      const rocketGain = this.ctx.createGain();
+      rocketOsc.type = 'sine';
+      rocketOsc.frequency.setValueAtTime(320, now);
+      rocketOsc.frequency.exponentialRampToValueAtTime(1400, now + 0.32);
+      rocketGain.gain.setValueAtTime(0.001, now);
+      rocketGain.gain.linearRampToValueAtTime(0.06, now + 0.08);
+      rocketGain.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
+      rocketOsc.connect(rocketGain);
+      rocketGain.connect(this.getDestination());
+      rocketOsc.start(now);
+      rocketOsc.stop(now + 0.35);
+
+      // Distant low boom explosion at burst
+      const boomOsc = this.ctx.createOscillator();
+      const boomGain = this.ctx.createGain();
+      boomOsc.type = 'triangle';
+      boomOsc.frequency.setValueAtTime(95, now + 0.33);
+      boomOsc.frequency.exponentialRampToValueAtTime(35, now + 0.75);
+      boomGain.gain.setValueAtTime(0.18, now + 0.33);
+      boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.78);
+      boomOsc.connect(boomGain);
+      boomGain.connect(this.getDestination());
+      boomOsc.start(now + 0.33);
+      boomOsc.stop(now + 0.8);
+
+      // Crackling sparkling burst stars
+      for (let i = 0; i < 4; i++) {
+        const starDelay = 0.36 + Math.random() * 0.28;
+        const starOsc = this.ctx.createOscillator();
+        const starGain = this.ctx.createGain();
+        starOsc.type = 'sawtooth';
+        starOsc.frequency.setValueAtTime(1800 + Math.random() * 1200, now + starDelay);
+        starOsc.frequency.exponentialRampToValueAtTime(400, now + starDelay + 0.04);
+        starGain.gain.setValueAtTime(0.03, now + starDelay);
+        starGain.gain.exponentialRampToValueAtTime(0.001, now + starDelay + 0.05);
+        starOsc.connect(starGain);
+        starGain.connect(this.getDestination());
+        starOsc.start(now + starDelay);
+        starOsc.stop(now + starDelay + 0.06);
+      }
+    } catch {
+      // Audio fallback
+    }
+  }
 }
 
 export const coastalAudio = new CoastalAudioEngine();

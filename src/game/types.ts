@@ -31,7 +31,8 @@ export type AchievementId =
   | 'coastal_milestone'
   | 'coastal_rainbow'
   | 'tailwind_rider'
-  | 'twilight_dreamer';
+  | 'twilight_dreamer'
+  | 'peloton_spirit';
 
 export type GraphicQuality = 'high' | 'battery_saver';
 
