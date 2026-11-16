@@ -1222,7 +1222,7 @@ export class PelicanScene {
       return;
     }
 
-    coastalAudio.playBell();
+    coastalAudio.playCustomBell(this.identity.bellTone);
     coastalAudio.playPelicanHonk();
     this.bellRingTimer = 0.65;
     this.bellRingMesh.visible = true;
@@ -2842,6 +2842,30 @@ export class PelicanScene {
       cMat.emissive.set(isNight ? 0x22d3ee : 0x000000);
       cMat.emissiveIntensity = isNight ? 0.85 : 0;
     });
+
+    // Procedural Ocean Sun Shimmer / Water Sparkles
+    if (this.timeOfDay === 'noon' || this.timeOfDay === 'sunset') {
+      if (Math.random() < 0.28 && this.particles.length < 90) {
+        const glintColor = this.timeOfDay === 'sunset' ? 0xfde047 : 0xffffff;
+        const glintMat = new THREE.MeshBasicMaterial({
+          color: glintColor,
+          transparent: true,
+          opacity: 0.78,
+        });
+        const glint = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), glintMat);
+        glint.position.set(
+          -14 - Math.random() * 35,
+          -0.12 + Math.sin(elapsedSec * 1.5) * 0.08,
+          this.playerZ - 12 - Math.random() * 68,
+        );
+        this.scene.add(glint);
+        this.particles.push({
+          mesh: glint,
+          vel: new THREE.Vector3((Math.random() - 0.5) * 0.2, 0, (Math.random() - 0.5) * 0.2),
+          life: 0.55 + Math.random() * 0.45,
+        });
+      }
+    }
 
     // Jumping Dolphins in coastal sea
     for (let i = 0; i < this.dolphins.length; i++) {

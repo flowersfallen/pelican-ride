@@ -70,6 +70,17 @@ export function GameHud({
         />
       )}
 
+      {/* High-Speed Dynamic Wind Velocity Streaks */}
+      {(hud.speedKmh > 52 || hud.isFeverMode) && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-10 overflow-hidden opacity-30 mix-blend-screen"
+        >
+          <div className="absolute top-0 bottom-0 left-0 w-16 sm:w-28 bg-gradient-to-r from-cyan-400/35 via-cyan-300/15 to-transparent" />
+          <div className="absolute top-0 bottom-0 right-0 w-16 sm:w-28 bg-gradient-to-l from-cyan-400/35 via-cyan-300/15 to-transparent" />
+        </div>
+      )}
+
       {/* Full-viewport red warning vignette when tsunami approaches */}
       {(isWarning || (isActive && hud.waveGapMeters < 6)) && (
         <div

@@ -221,6 +221,139 @@ class CoastalAudioEngine {
     });
   }
 
+  public playVintageHorn(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // Squeeze rubber bulb honk: 380Hz dipping to 310Hz with rich square/saw harmonics
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(390, now);
+      osc.frequency.exponentialRampToValueAtTime(310, now + 0.18);
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1400, now);
+      filter.Q.setValueAtTime(3.0, now);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.18, now + 0.02);
+      gain.gain.setValueAtTime(0.16, now + 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.getDestination());
+      osc.start(now);
+      osc.stop(now + 0.24);
+
+      // Second double-toot honk
+      const osc2 = this.ctx.createOscillator();
+      const gain2 = this.ctx.createGain();
+      osc2.type = 'sawtooth';
+      osc2.frequency.setValueAtTime(420, now + 0.14);
+      osc2.frequency.exponentialRampToValueAtTime(340, now + 0.32);
+
+      const filter2 = this.ctx.createBiquadFilter();
+      filter2.type = 'lowpass';
+      filter2.frequency.setValueAtTime(1500, now + 0.14);
+      filter2.Q.setValueAtTime(3.0, now + 0.14);
+
+      gain2.gain.setValueAtTime(0.001, now + 0.14);
+      gain2.gain.linearRampToValueAtTime(0.19, now + 0.16);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
+
+      osc2.connect(filter2);
+      filter2.connect(gain2);
+      gain2.connect(this.getDestination());
+      osc2.start(now + 0.14);
+      osc2.stop(now + 0.38);
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playElectronicBeep(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // High-tech digital sports dual beep: 2793Hz then 3520Hz
+      const osc1 = this.ctx.createOscillator();
+      const gain1 = this.ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(2793.8, now);
+      gain1.gain.setValueAtTime(0.12, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+      osc1.connect(gain1);
+      gain1.connect(this.getDestination());
+      osc1.start(now);
+      osc1.stop(now + 0.06);
+
+      const osc2 = this.ctx.createOscillator();
+      const gain2 = this.ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(3520.0, now + 0.055);
+      gain2.gain.setValueAtTime(0.14, now + 0.055);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+      osc2.connect(gain2);
+      gain2.connect(this.getDestination());
+      osc2.start(now + 0.055);
+      osc2.stop(now + 0.15);
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playConchHorn(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // Deep sea conch horn: 220Hz fundamental with warm harmonics
+      const freqs = [220, 440, 660];
+      const vols = [0.15, 0.09, 0.04];
+      freqs.forEach((f, idx) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = idx === 0 ? 'triangle' : 'sine';
+        osc.frequency.setValueAtTime(f * 0.96, now);
+        osc.frequency.linearRampToValueAtTime(f, now + 0.12);
+        osc.frequency.exponentialRampToValueAtTime(f * 0.94, now + 0.55);
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(vols[idx], now + 0.08);
+        gain.gain.setValueAtTime(vols[idx], now + 0.35);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(now);
+        osc.stop(now + 0.68);
+      });
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playCustomBell(tone?: string): void {
+    if (tone === 'vintage_horn') {
+      this.playVintageHorn();
+    } else if (tone === 'electronic') {
+      this.playElectronicBeep();
+    } else if (tone === 'conch') {
+      this.playConchHorn();
+    } else {
+      this.playBell();
+    }
+  }
+
   public playPickup(type: CollectibleType): void {
     if (this.muted) return;
     this.unlock();

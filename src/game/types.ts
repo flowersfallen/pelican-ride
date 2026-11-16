@@ -56,6 +56,8 @@ export interface LifetimeStats {
   totalDriftTurbos: number;
 }
 
+export type BellTone = 'brass' | 'vintage_horn' | 'electronic' | 'conch';
+
 export interface PelicanIdentity {
   id: string;
   tag: string;
@@ -65,6 +67,7 @@ export interface PelicanIdentity {
   scarfColor: string;
   frameColor: string;
   accentColor: string;
+  bellTone?: BellTone;
 }
 
 export interface InputState {

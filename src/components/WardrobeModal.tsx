@@ -1,12 +1,20 @@
-import { Check, Dices, Palette, Sparkles, X } from 'lucide-react';
-import { HatStyle, PelicanIdentity } from '../game/types';
+import { Bell, Check, Dices, Palette, Sparkles, X } from 'lucide-react';
+import { BellTone, HatStyle, PelicanIdentity } from '../game/types';
 import { createRandomPelicanIdentity } from '../game/pelicanProfile';
+import { coastalAudio } from '../game/sound';
 
 interface WardrobeModalProps {
   currentIdentity: PelicanIdentity;
   onUpdateIdentity: (patch: Partial<PelicanIdentity>) => void;
   onClose: () => void;
 }
+
+const BELL_TONE_OPTIONS: { id: BellTone; name: string; icon: string; desc: string }[] = [
+  { id: 'brass', name: '双音黄铜车铃', icon: '🔔', desc: '清脆回荡 Ding-Dong' },
+  { id: 'vintage_horn', name: '复古橡胶气笛', icon: '🎺', desc: '憨厚可爱 Honk-Honk' },
+  { id: 'electronic', name: '竞技双频蜂鸣', icon: '⚡', desc: '电竞赛车双频啾啾' },
+  { id: 'conch', name: '海螺远洋号角', icon: '🐚', desc: '深沉空灵深海之音' },
+];
 
 const HAT_OPTIONS: { id: HatStyle; name: string; icon: string }[] = [
   { id: 'cap', name: '公路头盔', icon: '🧢' },
@@ -225,6 +233,43 @@ export function WardrobeModal({
                   }`}
                 >
                   {selected && <Check className="w-4 h-4 text-white drop-shadow" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Section 5: Bell & Horn Sound Tone */}
+        <div className="mt-4">
+          <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Bell className="w-3.5 h-3.5 text-amber-300" />
+            <span>车铃声响音色 (Bell & Horn Acoustic Tone)</span>
+          </label>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {BELL_TONE_OPTIONS.map((b) => {
+              const selected = (currentIdentity.bellTone || 'brass') === b.id;
+              return (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => {
+                    coastalAudio.playCustomBell(b.id);
+                    onUpdateIdentity({ bellTone: b.id });
+                  }}
+                  className={`p-2.5 rounded-2xl border text-left transition-all flex items-center gap-2.5 ${
+                    selected
+                      ? 'border-amber-400 bg-amber-400/20 shadow-md shadow-amber-400/10'
+                      : 'border-white/10 bg-white/5 hover:bg-white/10 text-slate-300'
+                  }`}
+                >
+                  <span className="text-xl">{b.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-white flex items-center justify-between">
+                      <span>{b.name}</span>
+                      {selected && <Check className="w-3.5 h-3.5 text-amber-300" />}
+                    </div>
+                    <div className="text-[10px] text-slate-400 truncate">{b.desc}</div>
+                  </div>
                 </button>
               );
             })}
