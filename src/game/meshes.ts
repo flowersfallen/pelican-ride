@@ -1404,6 +1404,18 @@ export function createStarfield(): THREE.Points {
   return new THREE.Points(geo, mat);
 }
 
+export function createEveningStarMesh(): THREE.Mesh {
+  const geo = new THREE.OctahedronGeometry(1.4, 0);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xfef08a,
+    transparent: true,
+    opacity: 0,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(-65, 38, -190);
+  return mesh;
+}
+
 export function createRoadSignMesh(
   type: 'highway' | 'tsunami_evac' | 'scenic_route',
 ): THREE.Group {

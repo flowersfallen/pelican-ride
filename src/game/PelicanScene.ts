@@ -26,6 +26,7 @@ import {
   createMilestoneMarkerRig,
   createViewpointPavilionRig,
   createBeachCampsiteRig,
+  createEveningStarMesh,
   createRainbowRig,
   createWindsockRig,
   BeachCampsiteRig,
@@ -237,6 +238,12 @@ export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
     desc: '借海滨呼啸顺风飞驰，车速突破极限！',
     icon: '💨',
   },
+  twilight_dreamer: {
+    id: 'twilight_dreamer',
+    title: '落日余晖',
+    desc: '在金色晚霞与微风中静享海滨慢骑，突破 2,000 米里程！',
+    icon: '✨',
+  },
 };
 
 export class PelicanScene {
@@ -277,6 +284,7 @@ export class PelicanScene {
   private mountainRidge!: THREE.Group;
   private contactShadow!: THREE.Mesh;
   private starfield!: THREE.Points;
+  private eveningStar!: THREE.Mesh;
   private dolphins: DolphinRig[] = [];
   private roadSigns: THREE.Group[] = [];
   private jumpRamps: THREE.Group[] = [];
@@ -763,6 +771,10 @@ export class PelicanScene {
     // Starfield celestial sky dome for evening/night cycling
     this.starfield = createStarfield();
     this.scene.add(this.starfield);
+
+    // Radiant Evening Star over the coastal sea horizon
+    this.eveningStar = createEveningStarMesh();
+    this.scene.add(this.eveningStar);
 
     // Graceful Jumping Dolphins in deep coastal water
     for (let i = 0; i < 2; i++) {
@@ -1262,6 +1274,9 @@ export class PelicanScene {
     this.windsocks.forEach((sock, idx) => {
       sock.group.position.set(-ROAD_HALF_WIDTH - 0.45, 0, windsockZPositions[idx] || -85);
     });
+    if (this.eveningStar) {
+      (this.eveningStar.material as THREE.MeshBasicMaterial).opacity = 0;
+    }
 
     this.spawnCompanions();
     this.resetDisasterCycle(true);
@@ -1981,6 +1996,9 @@ export class PelicanScene {
     if (distanceMeters >= 100) this.checkAchievement('first_mile');
     if (this.speed * 3.2 >= 65) this.checkAchievement('speed_demon');
     if (this.tsunamisSurvived >= 3) this.checkAchievement('tsunami_master');
+    if (distanceMeters >= 2000 && (this.timeOfDay === 'sunset' || this.timeOfDay === 'night')) {
+      this.checkAchievement('twilight_dreamer');
+    }
 
     // Time-of-Day Cycling (Noon -> Sunset -> Night -> Dawn)
     const cycleMeters = distanceMeters % 3200;
@@ -2396,6 +2414,15 @@ export class PelicanScene {
       (targetStarOpacity - (this.starfield.material as THREE.PointsMaterial).opacity) * Math.min(1, 2 * dt);
     this.starfield.position.z = this.playerZ;
     this.starfield.rotation.y += dt * 0.005;
+
+    // Evening Star shining softly above western sea horizon at dusk/night
+    const targetEveningStarOpacity =
+      !isThreat && (this.timeOfDay === 'sunset' || this.timeOfDay === 'night') ? 0.92 : 0;
+    (this.eveningStar.material as THREE.MeshBasicMaterial).opacity +=
+      (targetEveningStarOpacity - (this.eveningStar.material as THREE.MeshBasicMaterial).opacity) *
+      Math.min(1, 2 * dt);
+    this.eveningStar.position.z = this.playerZ - 180;
+    this.eveningStar.scale.setScalar(0.9 + Math.sin(elapsedSec * 2.5) * 0.18);
 
     // Bicycle Headlamp: removed from default passive state; only projects as an active power-up effect!
     const isHeadlightActive = this.headlightTimer > 0;

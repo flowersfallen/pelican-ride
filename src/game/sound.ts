@@ -198,19 +198,26 @@ class CoastalAudioEngine {
     if (!this.ctx) return;
 
     const now = this.ctx.currentTime;
-    const freqs = [1568, 3136]; // Bright metallic bicycle bell harmonics
-    freqs.forEach((f, idx) => {
-      if (!this.ctx) return;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(f, now);
-      gain.gain.setValueAtTime(idx === 0 ? 0.14 : 0.06, now);
-      gain.gain.exponentialRampToValueAtTime(0.0008, now + 0.55);
-      osc.connect(gain);
-      gain.connect(this.getDestination());
-      osc.start(now);
-      osc.stop(now + 0.56);
+    // Classic two-hammer mechanical brass bell: strike 1 (Ding) + strike 2 (Dong)
+    const strikes = [
+      { delay: 0.0, freqs: [2093.0, 3136.0, 4186.0], vol: 0.16, decay: 0.58 }, // High Ding
+      { delay: 0.082, freqs: [1760.0, 2637.0, 3520.0], vol: 0.13, decay: 0.72 }, // Warm Dong
+    ];
+
+    strikes.forEach(({ delay, freqs, vol, decay }) => {
+      freqs.forEach((f, idx) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = idx === 0 ? 'sine' : 'triangle';
+        osc.frequency.setValueAtTime(f, now + delay);
+        gain.gain.setValueAtTime(idx === 0 ? vol : vol * 0.45, now + delay);
+        gain.gain.exponentialRampToValueAtTime(0.0005, now + delay + decay);
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(now + delay);
+        osc.stop(now + delay + decay + 0.02);
+      });
     });
   }
 

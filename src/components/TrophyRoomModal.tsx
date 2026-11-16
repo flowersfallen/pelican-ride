@@ -32,6 +32,7 @@ const ALL_ACHIEVEMENT_IDS: AchievementId[] = [
   'coastal_milestone',
   'coastal_rainbow',
   'tailwind_rider',
+  'twilight_dreamer',
 ];
 
 export function TrophyRoomModal({ hud, onClose }: TrophyRoomModalProps) {

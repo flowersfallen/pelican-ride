@@ -30,7 +30,8 @@ export type AchievementId =
   | 'blue_tears'
   | 'coastal_milestone'
   | 'coastal_rainbow'
-  | 'tailwind_rider';
+  | 'tailwind_rider'
+  | 'twilight_dreamer';
 
 export type GraphicQuality = 'high' | 'battery_saver';
 
