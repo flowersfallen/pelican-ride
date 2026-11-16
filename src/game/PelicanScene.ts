@@ -32,6 +32,7 @@ import {
   createCrescentMoonMesh,
   createRumbleStripMesh,
   createOverheadGantryRig,
+  createFinishArchRig,
   createPerchedSeagullMesh,
   createRainbowRig,
   createWindsockRig,
@@ -409,6 +410,8 @@ export class PelicanScene {
   private passedRumbleStrips = new Set<number>();
   private roadSigns: THREE.Group[] = [];
   private overheadGantries: THREE.Group[] = [];
+  private finishArch!: THREE.Group;
+  private finishArchCrossed = false;
   private jumpRamps: THREE.Group[] = [];
   private milestoneMarkers: MilestoneMarkerRig[] = [];
   private viewpointPavilions: ViewpointPavilionRig[] = [];
@@ -959,6 +962,11 @@ export class PelicanScene {
       this.scene.add(gantry);
     }
 
+    // 3000M Grand Tour Finish Arch
+    this.finishArch = createFinishArchRig(ROAD_HALF_WIDTH);
+    this.finishArch.position.set(0, 0, -3000);
+    this.scene.add(this.finishArch);
+
     // Wooden Boardwalk Jump Ramps (placed in outer lanes so idle cruising straight at 1.6 doesn't auto-hit)
     const rampZPositions = [-75, -165, -255];
     for (let i = 0; i < rampZPositions.length; i++) {
@@ -1215,6 +1223,35 @@ export class PelicanScene {
         mesh,
         vel,
         life: 0.85 + Math.random() * 0.45,
+      });
+    }
+  }
+
+  private spawnConfettiBurst(x: number, y: number, z: number): void {
+    const palette = [0xef4444, 0xfacc15, 0x38bdf8, 0xec4899, 0x10b981, 0x8b5cf6, 0xffffff];
+    const geom = new THREE.PlaneGeometry(0.18, 0.12);
+    for (let i = 0; i < 48; i++) {
+      const color = palette[Math.floor(Math.random() * palette.length)];
+      const mat = new THREE.MeshBasicMaterial({
+        color,
+        side: THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.set(
+        x + (Math.random() - 0.5) * 8.5,
+        y + (Math.random() - 0.5) * 1.5,
+        z + (Math.random() - 0.5) * 4.0,
+      );
+      mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      this.scene.add(mesh);
+      this.particles.push({
+        mesh,
+        vel: new THREE.Vector3(
+          (Math.random() - 0.5) * 3.5,
+          1.5 + Math.random() * 3.0,
+          (Math.random() - 0.5) * 3.5,
+        ),
+        life: 1.8 + Math.random() * 0.8,
       });
     }
   }
@@ -1604,6 +1641,11 @@ export class PelicanScene {
     this.overheadGantries.forEach((gantry, idx) => {
       gantry.position.set(0, 0, gantryPositions[idx] || -1000);
     });
+
+    this.finishArchCrossed = false;
+    if (this.finishArch) {
+      this.finishArch.position.set(0, 0, -3000);
+    }
 
     this.rainbowPassed = false;
     this.rainbowRig.group.position.set(0, 0, this.playerZ - 320);
@@ -2186,24 +2228,26 @@ export class PelicanScene {
           this.checkAchievement('peloton_spirit');
         }
       }
-      // Aerodynamic cyan slipstream ribbon particle
-      if (Math.random() < 0.45 && draftingCompanion) {
+      // Aerodynamic dual vortex slipstream ribbons streaming from lead rider
+      if (Math.random() < 0.65 && draftingCompanion) {
         const ribbonMat = new THREE.MeshBasicMaterial({
           color: 0x38bdf8,
           transparent: true,
-          opacity: 0.7,
+          opacity: 0.75,
         });
-        const ribbon = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.8), ribbonMat);
-        ribbon.position.set(
-          draftingCompanion.laneX + (Math.random() - 0.5) * 0.4,
-          0.45 + (Math.random() - 0.5) * 0.25,
-          (this.playerZ + draftingCompanion.z) * 0.5 + (Math.random() - 0.5) * 0.8,
-        );
-        this.scene.add(ribbon);
-        this.particles.push({
-          mesh: ribbon,
-          vel: new THREE.Vector3(0, 0, 12),
-          life: 0.25,
+        [-0.32, 0.32].forEach((sideOffset) => {
+          const ribbon = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 1.1), ribbonMat);
+          ribbon.position.set(
+            draftingCompanion.laneX + sideOffset,
+            0.55 + Math.sin(elapsedSec * 16 + sideOffset) * 0.08,
+            draftingCompanion.z + 0.8 + Math.random() * 0.8,
+          );
+          this.scene.add(ribbon);
+          this.particles.push({
+            mesh: ribbon,
+            vel: new THREE.Vector3((this.playerX - draftingCompanion.laneX) * 0.8, 0, this.speed + 14),
+            life: 0.3,
+          });
         });
       }
     } else {
@@ -2468,6 +2512,27 @@ export class PelicanScene {
     }
     if (distanceMeters >= 3000) {
       this.checkAchievement('century_rider');
+    }
+
+    // 3000M Grand Tour Finish Line Celebration
+    if (this.playerZ <= -3000 && !this.finishArchCrossed) {
+      this.finishArchCrossed = true;
+      coastalAudio.playFirework();
+      this.spawnConfettiBurst(0, 5.0, -3000);
+      this.spawnFireworkBurst(-5, 15, -3015);
+      this.spawnFireworkBurst(5, 15, -3015);
+      this.bannerText = '🏆 冲过 3000M 巡礼终点线！座驾登顶【海角传说】！';
+      this.bannerTimer = 4.2;
+      try {
+        navigator.vibrate?.([60, 40, 80, 40, 100]);
+      } catch {}
+      if (this.companions.length > 0) {
+        this.showCompanionSpeech(
+          this.companions[0],
+          '突破3000米大关！我们完成了海角大巡礼！🎉',
+          4.0,
+        );
+      }
     }
 
     // Time-of-Day Cycling (Noon -> Sunset -> Night -> Dawn)
@@ -3177,6 +3242,12 @@ export class PelicanScene {
       if (gantry.position.z > this.playerZ + 85) {
         gantry.position.z -= 2 * 1000;
       }
+    }
+
+    // 3000M Grand Tour Finish Arch recycling
+    if (this.finishArch && this.finishArch.position.z > this.playerZ + 85) {
+      this.finishArch.position.z -= 3000;
+      this.finishArchCrossed = false;
     }
 
     for (const pavilion of this.viewpointPavilions) {

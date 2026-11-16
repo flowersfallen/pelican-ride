@@ -1595,6 +1595,113 @@ export function createOverheadGantryRig(roadHalfWidth = 6.2): THREE.Group {
   return group;
 }
 
+export function createFinishArchRig(roadHalfWidth = 6.2): THREE.Group {
+  const group = new THREE.Group();
+
+  const pillarMatRed = new THREE.MeshStandardMaterial({
+    color: 0xef4444, // Racing red
+    roughness: 0.4,
+    flatShading: true,
+  });
+  const pillarMatWhite = new THREE.MeshStandardMaterial({
+    color: 0xf8fafc, // Clean white
+    roughness: 0.4,
+    flatShading: true,
+  });
+
+  const spanWidth = (roadHalfWidth + 0.8) * 2;
+  const archHeight = 5.2;
+
+  // Left & right curved inflatable columns with striped segments
+  [-roadHalfWidth - 0.8, roadHalfWidth + 0.8].forEach((xPos) => {
+    for (let s = 0; s < 6; s++) {
+      const segGeo = new THREE.CylinderGeometry(0.42, 0.45, 0.9, 10);
+      const segMesh = new THREE.Mesh(segGeo, s % 2 === 0 ? pillarMatRed : pillarMatWhite);
+      segMesh.position.set(xPos, 0.45 + s * 0.85, 0);
+      segMesh.castShadow = true;
+      group.add(segMesh);
+    }
+  });
+
+  // Cross arch beam
+  const beamGeo = new THREE.CylinderGeometry(0.42, 0.42, spanWidth + 0.8, 12);
+  const beamMat = new THREE.MeshStandardMaterial({
+    color: 0xef4444,
+    roughness: 0.4,
+    flatShading: true,
+  });
+  const crossBeam = new THREE.Mesh(beamGeo, beamMat);
+  crossBeam.rotation.z = Math.PI / 2;
+  crossBeam.position.set(0, archHeight, 0);
+  crossBeam.castShadow = true;
+  group.add(crossBeam);
+
+  // Checkerboard finish line hanging banner
+  const bannerCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+  if (bannerCanvas) {
+    bannerCanvas.width = 512;
+    bannerCanvas.height = 160;
+    const bCtx = bannerCanvas.getContext('2d');
+    if (bCtx) {
+      bCtx.fillStyle = '#0f172a';
+      bCtx.fillRect(0, 0, 512, 160);
+
+      const checkSize = 16;
+      for (let cx = 0; cx < 512; cx += checkSize) {
+        for (let cy = 0; cy < 160; cy += checkSize) {
+          if (cy < 20 || cy > 140) {
+            bCtx.fillStyle = (Math.floor(cx / checkSize) + Math.floor(cy / checkSize)) % 2 === 0 ? '#ffffff' : '#0f172a';
+            bCtx.fillRect(cx, cy, checkSize, checkSize);
+          }
+        }
+      }
+
+      bCtx.fillStyle = '#facc15';
+      bCtx.font = 'bold 36px sans-serif';
+      bCtx.textAlign = 'center';
+      bCtx.fillText('🏁 G228 海岸国家观光道 · 3000M 🏁', 256, 75);
+      bCtx.font = 'bold 22px sans-serif';
+      bCtx.fillStyle = '#ffffff';
+      bCtx.fillText('FINISH LINE · 百里巡礼终点', 256, 118);
+    }
+    const bannerTexture = new THREE.CanvasTexture(bannerCanvas);
+    const bannerGeo = new THREE.BoxGeometry(8.2, 1.8, 0.08);
+    const bannerMesh = new THREE.Mesh(
+      bannerGeo,
+      new THREE.MeshBasicMaterial({ map: bannerTexture }),
+    );
+    bannerMesh.position.set(0, archHeight - 0.95, 0);
+    group.add(bannerMesh);
+  }
+
+  // Road tarmac finish line checkerboard stripe across the highway surface
+  const stripeGeo = new THREE.BoxGeometry(spanWidth - 1.2, 0.02, 1.2);
+  const stripeCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+  if (stripeCanvas) {
+    stripeCanvas.width = 256;
+    stripeCanvas.height = 32;
+    const sCtx = stripeCanvas.getContext('2d');
+    if (sCtx) {
+      const sq = 16;
+      for (let x = 0; x < 256; x += sq) {
+        for (let y = 0; y < 32; y += sq) {
+          sCtx.fillStyle = (Math.floor(x / sq) + Math.floor(y / sq)) % 2 === 0 ? '#ffffff' : '#0f172a';
+          sCtx.fillRect(x, y, sq, sq);
+        }
+      }
+    }
+    const stripeTexture = new THREE.CanvasTexture(stripeCanvas);
+    const groundFinishStripe = new THREE.Mesh(
+      stripeGeo,
+      new THREE.MeshBasicMaterial({ map: stripeTexture }),
+    );
+    groundFinishStripe.position.set(0, 0.015, 0);
+    group.add(groundFinishStripe);
+  }
+
+  return group;
+}
+
 export interface PerchedSeagullRig {
   group: THREE.Group;
   leftWing: THREE.Mesh;
