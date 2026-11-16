@@ -1281,6 +1281,98 @@ class CoastalAudioEngine {
       // Audio fallback
     }
   }
+
+  public playWhaleSong(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // Deep resonant haunting whale call
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+
+      // Pitch glide: 145Hz gliding gently to 105Hz then 125Hz
+      osc.frequency.setValueAtTime(145, now);
+      osc.frequency.exponentialRampToValueAtTime(105, now + 1.2);
+      osc.frequency.linearRampToValueAtTime(125, now + 2.4);
+
+      // Low frequency modulation (vibrato) for organic vocalization
+      const lfo = this.ctx.createOscillator();
+      const lfoGain = this.ctx.createGain();
+      lfo.frequency.setValueAtTime(4.2, now);
+      lfoGain.gain.setValueAtTime(8, now);
+      lfo.connect(lfoGain);
+      lfoGain.connect(osc.frequency);
+      lfo.start(now);
+      lfo.stop(now + 2.8);
+
+      // Slow oceanic swell envelope
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.12, now + 0.6);
+      gain.gain.setValueAtTime(0.12, now + 1.8);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 2.7);
+
+      osc.connect(gain);
+      gain.connect(this.getDestination());
+      osc.start(now);
+      osc.stop(now + 2.8);
+
+      // Ethereal overtone harmonic
+      const overtone = this.ctx.createOscillator();
+      const overGain = this.ctx.createGain();
+      overtone.type = 'sine';
+      overtone.frequency.setValueAtTime(290, now);
+      overtone.frequency.exponentialRampToValueAtTime(220, now + 1.2);
+      overtone.frequency.linearRampToValueAtTime(260, now + 2.2);
+      overGain.gain.setValueAtTime(0.001, now);
+      overGain.gain.linearRampToValueAtTime(0.04, now + 0.7);
+      overGain.gain.exponentialRampToValueAtTime(0.001, now + 2.4);
+      overtone.connect(overGain);
+      overGain.connect(this.getDestination());
+      overtone.start(now);
+      overtone.stop(now + 2.5);
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playWaterSpout(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // High-pressure white noise hissing burst
+      const bufferSize = Math.floor(this.ctx.sampleRate * 1.5);
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.9));
+      }
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1200, now);
+      filter.Q.setValueAtTime(1.8, now);
+
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.14, now + 0.2);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.getDestination());
+      noise.start(now);
+      noise.stop(now + 1.5);
+    } catch {
+      // Audio fallback
+    }
+  }
 }
 
 export const coastalAudio = new CoastalAudioEngine();

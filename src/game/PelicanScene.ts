@@ -29,6 +29,7 @@ import {
   createEveningStarMesh,
   createRainbowRig,
   createWindsockRig,
+  createWhaleMesh,
   BeachCampsiteRig,
   DolphinRig,
   LighthouseRig,
@@ -40,6 +41,7 @@ import {
   TsunamiRig,
   TurtleRig,
   ViewpointPavilionRig,
+  WhaleRig,
   WindsockRig,
   WindTurbineRig,
 } from './meshes';
@@ -319,6 +321,12 @@ export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
     desc: '与同行车队完成气流破风与铃声互动，并肩穿越海风！',
     icon: '🚴‍♂️',
   },
+  ocean_whale: {
+    id: 'ocean_whale',
+    title: '巨鲸跃浪',
+    desc: '在浩瀚远海见证抹香巨鲸破浪跃出与壮阔喷泉！',
+    icon: '🐋',
+  },
 };
 
 export class PelicanScene {
@@ -361,6 +369,7 @@ export class PelicanScene {
   private starfield!: THREE.Points;
   private eveningStar!: THREE.Mesh;
   private dolphins: DolphinRig[] = [];
+  private whales: WhaleRig[] = [];
   private roadSigns: THREE.Group[] = [];
   private jumpRamps: THREE.Group[] = [];
   private milestoneMarkers: MilestoneMarkerRig[] = [];
@@ -861,6 +870,16 @@ export class PelicanScene {
       this.scene.add(dolphin.group);
     }
 
+    // Majestic Deep-Ocean Whales
+    for (let i = 0; i < 2; i++) {
+      const whale = createWhaleMesh();
+      whale.baseX = -54 - i * 18;
+      whale.baseZ = this.playerZ - 110 - i * 140;
+      whale.group.position.set(whale.baseX, -6.0, whale.baseZ);
+      this.whales.push(whale);
+      this.scene.add(whale.group);
+    }
+
     // Coastal Highway 101, Tsunami Evacuation Route & Scenic Bike Signs
     const signTypes: ('highway' | 'tsunami_evac' | 'scenic_route')[] = [
       'highway',
@@ -1103,6 +1122,33 @@ export class PelicanScene {
     }
   }
 
+  private spawnWhaleSpout(x: number, y: number, z: number): void {
+    const mistMat = new THREE.MeshBasicMaterial({
+      color: 0xe0f2fe, // Translucent ocean mist
+      transparent: true,
+      opacity: 0.85,
+    });
+    const geom = new THREE.SphereGeometry(0.18, 6, 6);
+    for (let i = 0; i < 36; i++) {
+      const mesh = new THREE.Mesh(geom, mistMat);
+      mesh.position.set(
+        x + (Math.random() - 0.5) * 0.8,
+        y + Math.random() * 0.8,
+        z + (Math.random() - 0.5) * 0.8,
+      );
+      this.scene.add(mesh);
+      this.particles.push({
+        mesh,
+        vel: new THREE.Vector3(
+          (Math.random() - 0.5) * 1.8 - 0.8, // Drifting gently towards shore
+          8.5 + Math.random() * 6.5,         // High-pressure tall water fountain
+          (Math.random() - 0.5) * 2.2,
+        ),
+        life: 1.1 + Math.random() * 0.5,
+      });
+    }
+  }
+
   private resetDisasterCycle(initialStart: boolean): void {
     this.disasterPhase = 'calm';
     // Initial session triggers slightly earlier (14-22s) so players meet the wave organically
@@ -1225,6 +1271,18 @@ export class PelicanScene {
         turtle.isStartled = true;
         turtle.startleTimer = 3.2;
         this.checkAchievement('coastal_turtle');
+      }
+    }
+
+    // Beckon deep ocean whale to breach and spout when bell sounds!
+    for (const whale of this.whales) {
+      const dz = Math.abs(whale.group.position.z - this.playerZ);
+      if (dz < 130 && !whale.isJumping) {
+        whale.isJumping = true;
+        whale.jumpTimer = 0;
+        whale.hasSpouted = false;
+        whale.baseZ = this.playerZ - 18 - Math.random() * 25;
+        break;
       }
     }
   }
@@ -1450,6 +1508,14 @@ export class PelicanScene {
     if (this.eveningStar) {
       (this.eveningStar.material as THREE.MeshBasicMaterial).opacity = 0;
     }
+
+    this.whales.forEach((whale, idx) => {
+      whale.isJumping = false;
+      whale.jumpTimer = Math.random() * 10;
+      whale.hasSpouted = false;
+      whale.baseZ = this.playerZ - 110 - idx * 140;
+      whale.group.position.set(whale.baseX, -6.0, whale.baseZ);
+    });
 
     this.spawnCompanions();
     this.resetDisasterCycle(true);
@@ -2656,12 +2722,25 @@ export class PelicanScene {
     rainMat.opacity += (targetRainOpacity - rainMat.opacity) * Math.min(1, 3.5 * dt);
     this.isRaining = rainMat.opacity > 0.05;
 
-    // Dynamic Road Surface Wetness Reflection during storm rain
+    // Dynamic Road Surface Wetness Reflection during storm rain or receding tsunami
+    const isWetRoad = this.isRaining || this.disasterPhase === 'receding';
     if (this.roadMat) {
-      const targetRoughness = this.isRaining ? 0.22 : 0.88;
-      const targetMetalness = this.isRaining ? 0.38 : 0.05;
+      const targetRoughness = isWetRoad ? 0.24 : 0.88;
+      const targetMetalness = isWetRoad ? 0.36 : 0.05;
       this.roadMat.roughness += (targetRoughness - this.roadMat.roughness) * Math.min(1, 2.5 * dt);
       this.roadMat.metalness += (targetMetalness - this.roadMat.metalness) * Math.min(1, 2.5 * dt);
+    }
+
+    if (isWetRoad && Math.abs(this.speed) > 10 && Math.random() < 0.25) {
+      const sprayMat = new THREE.MeshBasicMaterial({ color: 0xc7d2fe, transparent: true, opacity: 0.65 });
+      const spray = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.06), sprayMat);
+      spray.position.set(this.playerX + (Math.random() - 0.5) * 0.2, 0.08, this.playerZ + 0.7);
+      this.scene.add(spray);
+      this.particles.push({
+        mesh: spray,
+        vel: new THREE.Vector3((Math.random() - 0.5) * 1.8, 1.2 + Math.random() * 0.8, 4.0),
+        life: 0.22,
+      });
     }
 
     if (rainMat.opacity > 0.01) {
@@ -2746,6 +2825,70 @@ export class PelicanScene {
           dol.isJumping = false;
           dol.group.position.y = -4;
           this.spawnSplashParticles(dol.baseX, 0, dol.baseZ - 14);
+        }
+      }
+    }
+
+    // Majestic Deep-Ocean Whales
+    for (const whale of this.whales) {
+      whale.jumpTimer += dt;
+      if (!whale.isJumping && whale.jumpTimer >= whale.jumpCycleTime) {
+        whale.isJumping = true;
+        whale.jumpTimer = 0;
+        whale.hasSpouted = false;
+        whale.baseZ = this.playerZ - 45 - Math.random() * 65;
+      }
+
+      if (whale.isJumping) {
+        const duration = 5.2;
+        const t = whale.jumpTimer / duration;
+        if (t >= 1) {
+          whale.isJumping = false;
+          whale.jumpTimer = 0;
+          whale.hasSpouted = false;
+          whale.group.position.y = -6.0;
+          this.spawnSplashParticles(whale.baseX, 0, whale.baseZ - 24);
+        } else {
+          // Parabolic breach arc: submerged -> rise up to +5.8m -> dive down
+          const peakY = 5.8;
+          const y = -6.0 + (peakY + 6.0) * Math.sin(t * Math.PI);
+          whale.group.position.y = y;
+          whale.group.position.x = whale.baseX;
+          whale.group.position.z = whale.baseZ - t * 24;
+
+          // Pitch rotation: head up while rising, arched at crest, diving down at end
+          whale.group.rotation.x = (t - 0.48) * 1.5;
+          // Roll slightly for natural breaching spectacle
+          whale.group.rotation.z = Math.sin(t * Math.PI) * 0.35;
+
+          // Tail fluke undulating animation
+          whale.tailFluke.rotation.x = Math.sin(t * 14) * 0.45;
+          whale.flipperLeft.rotation.z = -0.4 + Math.sin(t * 8) * 0.2;
+          whale.flipperRight.rotation.z = 0.4 - Math.sin(t * 8) * 0.2;
+
+          // Water spout mist at crest (when y > 3.2m)
+          if (t > 0.32 && !whale.hasSpouted) {
+            whale.hasSpouted = true;
+            coastalAudio.playWaterSpout();
+            coastalAudio.playWhaleSong();
+            this.spawnWhaleSpout(
+              whale.group.position.x,
+              whale.group.position.y + 1.8,
+              whale.group.position.z - 3.8,
+            );
+            this.bannerText = '🐋 远海有巨鲸破浪出海，昂首向天喷泉！';
+            this.bannerTimer = 3.6;
+            this.checkAchievement('ocean_whale');
+          }
+        }
+      } else {
+        // Gentle underwater cruising & bobbing
+        whale.group.position.y = -5.5 + Math.sin(elapsedSec * 0.8) * 0.6;
+        whale.group.position.x = whale.baseX;
+        whale.tailFluke.rotation.x = Math.sin(elapsedSec * 1.8) * 0.15;
+        if (whale.group.position.z > this.playerZ + 80) {
+          whale.baseZ = this.playerZ - 140 - Math.random() * 80;
+          whale.group.position.z = whale.baseZ;
         }
       }
     }
@@ -2890,6 +3033,27 @@ export class PelicanScene {
         try {
           navigator.vibrate?.([25, 20, 35]);
         } catch {}
+      }
+
+      // Twilight & nighttime fireflies hovering gently around campsite tents
+      if ((this.timeOfDay === 'sunset' || this.timeOfDay === 'night') && Math.random() < 0.18) {
+        const fireflyMat = new THREE.MeshBasicMaterial({
+          color: 0xfef08a,
+          transparent: true,
+          opacity: 0.85,
+        });
+        const firefly = new THREE.Mesh(new THREE.SphereGeometry(0.06, 4, 4), fireflyMat);
+        firefly.position.set(
+          camp.group.position.x + (Math.random() - 0.5) * 4.5,
+          0.8 + Math.random() * 1.6,
+          camp.group.position.z + (Math.random() - 0.5) * 4.5,
+        );
+        this.scene.add(firefly);
+        this.particles.push({
+          mesh: firefly,
+          vel: new THREE.Vector3((Math.random() - 0.5) * 0.4, 0.2 + Math.random() * 0.3, (Math.random() - 0.5) * 0.4),
+          life: 1.4 + Math.random() * 0.8,
+        });
       }
 
       if (camp.group.position.z > this.playerZ + 65) {

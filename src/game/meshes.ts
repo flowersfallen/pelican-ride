@@ -2305,3 +2305,121 @@ export function createWindsockRig(): WindsockRig {
     baseZ: -50,
   };
 }
+
+export interface WhaleRig {
+  group: THREE.Group;
+  tailFluke: THREE.Group;
+  flipperLeft: THREE.Group;
+  flipperRight: THREE.Group;
+  jumpTimer: number;
+  isJumping: boolean;
+  jumpCycleTime: number;
+  baseX: number;
+  baseZ: number;
+  hasSpouted: boolean;
+}
+
+export function createWhaleMesh(): WhaleRig {
+  const group = new THREE.Group();
+
+  // Low-poly deep ocean humpback whale materials
+  const whaleSkinMat = new THREE.MeshStandardMaterial({
+    color: 0x1e293b, // Deep slate navy
+    roughness: 0.35,
+    metalness: 0.15,
+    flatShading: true,
+  });
+  const bellyMat = new THREE.MeshStandardMaterial({
+    color: 0x94a3b8, // Light misty slate underbelly
+    roughness: 0.45,
+    flatShading: true,
+  });
+
+  // Main Torso (massive rounded streamlined body)
+  const bodyGeo = new THREE.ConeGeometry(1.6, 6.2, 8);
+  const body = new THREE.Mesh(bodyGeo, whaleSkinMat);
+  body.rotation.x = Math.PI / 2;
+  body.castShadow = true;
+  group.add(body);
+
+  // Large rounded head / rostrum
+  const headGeo = new THREE.SphereGeometry(1.5, 8, 7);
+  const head = new THREE.Mesh(headGeo, whaleSkinMat);
+  head.scale.set(1.0, 0.85, 1.4);
+  head.position.set(0, 0.05, -3.2);
+  group.add(head);
+
+  // Underbelly ventral pleats
+  const belly = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.1, 4.0, 7), bellyMat);
+  belly.rotation.x = Math.PI / 2;
+  belly.position.set(0, -0.45, -1.2);
+  belly.scale.set(0.9, 0.5, 1.0);
+  group.add(belly);
+
+  // Dorsal fin / hump
+  const dorsal = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.1, 5), whaleSkinMat);
+  dorsal.position.set(0, 1.45, 0.8);
+  dorsal.rotation.x = -0.55;
+  group.add(dorsal);
+
+  // Pectoral flippers
+  const flipperGeo = new THREE.BoxGeometry(0.35, 0.12, 2.2);
+  const flipperLeft = new THREE.Group();
+  const leftMesh = new THREE.Mesh(flipperGeo, whaleSkinMat);
+  leftMesh.position.set(-1.1, 0, 0.8);
+  leftMesh.rotation.y = -0.35;
+  leftMesh.rotation.z = -0.4;
+  flipperLeft.position.set(-1.2, -0.3, -1.2);
+  flipperLeft.add(leftMesh);
+  group.add(flipperLeft);
+
+  const flipperRight = new THREE.Group();
+  const rightMesh = new THREE.Mesh(flipperGeo, whaleSkinMat);
+  rightMesh.position.set(1.1, 0, 0.8);
+  rightMesh.rotation.y = 0.35;
+  rightMesh.rotation.z = 0.4;
+  flipperRight.position.set(1.2, -0.3, -1.2);
+  flipperRight.add(rightMesh);
+  group.add(flipperRight);
+
+  // Articulated tail fluke
+  const tailFluke = new THREE.Group();
+  tailFluke.position.set(0, 0.1, 3.1);
+
+  const tailStem = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 1.1, 2.4, 7), whaleSkinMat);
+  tailStem.rotation.x = Math.PI / 2;
+  tailStem.position.set(0, 0, 1.2);
+  tailFluke.add(tailStem);
+
+  // Broad majestic caudal fluke wings
+  const flukeWing = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.14, 1.1), whaleSkinMat);
+  flukeWing.position.set(0, 0, 2.4);
+  flukeWing.rotation.x = -0.15;
+  tailFluke.add(flukeWing);
+
+  group.add(tailFluke);
+
+  // Blowhole indicator
+  const blowhole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.18, 0.22, 0.1, 8),
+    new THREE.MeshBasicMaterial({ color: 0x0f172a }),
+  );
+  blowhole.position.set(0, 1.18, -2.4);
+  group.add(blowhole);
+
+  group.scale.setScalar(1.6);
+  group.position.y = -6.0; // Initially deep underwater
+
+  return {
+    group,
+    tailFluke,
+    flipperLeft,
+    flipperRight,
+    jumpTimer: Math.random() * 15,
+    isJumping: false,
+    jumpCycleTime: 24 + Math.random() * 14,
+    baseX: -52 - Math.random() * 18,
+    baseZ: -120,
+    hasSpouted: false,
+  };
+}

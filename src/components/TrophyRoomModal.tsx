@@ -34,6 +34,7 @@ const ALL_ACHIEVEMENT_IDS: AchievementId[] = [
   'tailwind_rider',
   'twilight_dreamer',
   'peloton_spirit',
+  'ocean_whale',
 ];
 
 export function TrophyRoomModal({ hud, onClose }: TrophyRoomModalProps) {

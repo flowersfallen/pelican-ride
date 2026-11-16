@@ -32,7 +32,8 @@ export type AchievementId =
   | 'coastal_rainbow'
   | 'tailwind_rider'
   | 'twilight_dreamer'
-  | 'peloton_spirit';
+  | 'peloton_spirit'
+  | 'ocean_whale';
 
 export type GraphicQuality = 'high' | 'battery_saver';
 
