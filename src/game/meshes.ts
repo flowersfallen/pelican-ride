@@ -1534,6 +1534,67 @@ export function createRumbleStripMesh(): THREE.Group {
   return group;
 }
 
+export function createOverheadGantryRig(roadHalfWidth = 6.2): THREE.Group {
+  const group = new THREE.Group();
+
+  const steelMat = new THREE.MeshStandardMaterial({
+    color: 0x94a3b8, // Galvanized highway steel
+    metalness: 0.6,
+    roughness: 0.4,
+    flatShading: true,
+  });
+
+  const columnGeo = new THREE.BoxGeometry(0.35, 5.4, 0.35);
+  const leftCol = new THREE.Mesh(columnGeo, steelMat);
+  leftCol.position.set(-roadHalfWidth - 1.0, 2.7, 0);
+  leftCol.castShadow = true;
+  group.add(leftCol);
+
+  const rightCol = new THREE.Mesh(columnGeo, steelMat);
+  rightCol.position.set(roadHalfWidth + 1.0, 2.7, 0);
+  rightCol.castShadow = true;
+  group.add(rightCol);
+
+  // Cross truss beam bridging over the road
+  const beamGeo = new THREE.BoxGeometry((roadHalfWidth + 1.0) * 2 + 0.4, 0.45, 0.45);
+  const beam = new THREE.Mesh(beamGeo, steelMat);
+  beam.position.set(0, 5.1, 0);
+  beam.castShadow = true;
+  group.add(beam);
+
+  // Signboard canvas
+  const signCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+  if (signCanvas) {
+    signCanvas.width = 512;
+    signCanvas.height = 160;
+    const sCtx = signCanvas.getContext('2d');
+    if (sCtx) {
+      sCtx.fillStyle = '#047857'; // Highway green
+      sCtx.fillRect(0, 0, 512, 160);
+      sCtx.strokeStyle = '#ffffff';
+      sCtx.lineWidth = 8;
+      sCtx.strokeRect(8, 8, 496, 144);
+      sCtx.fillStyle = '#ffffff';
+      sCtx.font = 'bold 36px sans-serif';
+      sCtx.textAlign = 'center';
+      sCtx.fillText('G228 平潭沿海国家观光道', 256, 56);
+      sCtx.font = 'bold 24px sans-serif';
+      sCtx.fillStyle = '#fde047';
+      sCtx.fillText('望潮湾 450M ↗   海角天涯 1950M ↑   限速 60', 256, 114);
+    }
+    const signTexture = new THREE.CanvasTexture(signCanvas);
+    const signGeo = new THREE.BoxGeometry(7.6, 1.8, 0.08);
+    const signMesh = new THREE.Mesh(
+      signGeo,
+      new THREE.MeshBasicMaterial({ map: signTexture }),
+    );
+    signMesh.position.set(0, 4.2, 0);
+    group.add(signMesh);
+  }
+
+  return group;
+}
+
 export interface PerchedSeagullRig {
   group: THREE.Group;
   leftWing: THREE.Mesh;

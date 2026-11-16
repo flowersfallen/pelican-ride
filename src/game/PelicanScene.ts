@@ -31,6 +31,7 @@ import {
   createEveningStarMesh,
   createCrescentMoonMesh,
   createRumbleStripMesh,
+  createOverheadGantryRig,
   createPerchedSeagullMesh,
   createRainbowRig,
   createWindsockRig,
@@ -407,6 +408,7 @@ export class PelicanScene {
   private rumbleStrips: THREE.Group[] = [];
   private passedRumbleStrips = new Set<number>();
   private roadSigns: THREE.Group[] = [];
+  private overheadGantries: THREE.Group[] = [];
   private jumpRamps: THREE.Group[] = [];
   private milestoneMarkers: MilestoneMarkerRig[] = [];
   private viewpointPavilions: ViewpointPavilionRig[] = [];
@@ -946,6 +948,15 @@ export class PelicanScene {
       sign.position.set(ROAD_HALF_WIDTH + 1.25, 0, -38 - i * 65);
       this.roadSigns.push(sign);
       this.scene.add(sign);
+    }
+
+    // G228 Coastal Highway Overhead Directional Gantries
+    const gantryPositions = [-1000, -2000];
+    for (const gz of gantryPositions) {
+      const gantry = createOverheadGantryRig(ROAD_HALF_WIDTH);
+      gantry.position.set(0, 0, gz);
+      this.overheadGantries.push(gantry);
+      this.scene.add(gantry);
     }
 
     // Wooden Boardwalk Jump Ramps (placed in outer lanes so idle cruising straight at 1.6 doesn't auto-hit)
@@ -1589,6 +1600,11 @@ export class PelicanScene {
       rumble.position.set(0, 0, viewpointDefs[idx] + 35);
     });
 
+    const gantryPositions = [-1000, -2000];
+    this.overheadGantries.forEach((gantry, idx) => {
+      gantry.position.set(0, 0, gantryPositions[idx] || -1000);
+    });
+
     this.rainbowPassed = false;
     this.rainbowRig.group.position.set(0, 0, this.playerZ - 320);
     this.rainbowRig.opacity = 0;
@@ -1908,11 +1924,33 @@ export class PelicanScene {
   private handlePickup(item: CollectibleEntity): void {
     this.pickups[item.type] += 1;
     this.lifetimeStats.totalPickups += 1;
+    const isSnappingBeak = this.beakSnapTimer > 0.05 || this.bellRingTimer > 0;
     this.beakSnapTimer = 0.35;
     coastalAudio.playPickup(item.type);
     try {
       navigator.vibrate?.(25);
     } catch {}
+
+    if (isSnappingBeak) {
+      this.xp += 1;
+      this.bannerText = '✨ 完美飞啄！PERFECT CATCH +1 风格星！';
+      this.bannerTimer = 1.6;
+      const starMat = new THREE.MeshBasicMaterial({ color: 0xfde047, transparent: true, opacity: 0.9 });
+      for (let s = 0; s < 8; s++) {
+        const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), starMat);
+        star.position.set(
+          item.mesh.position.x + (Math.random() - 0.5) * 0.6,
+          item.mesh.position.y + 0.3 + (Math.random() - 0.5) * 0.6,
+          item.mesh.position.z + (Math.random() - 0.5) * 0.6,
+        );
+        this.scene.add(star);
+        this.particles.push({
+          mesh: star,
+          vel: new THREE.Vector3((Math.random() - 0.5) * 2.5, 2.0 + Math.random() * 2.0, (Math.random() - 0.5) * 2.5),
+          life: 0.6,
+        });
+      }
+    }
 
     // Combo Chain System
     if (this.comboTimer > 0) {
@@ -3131,6 +3169,13 @@ export class PelicanScene {
           marker.targetMeters >= 1000
             ? `G228 ${(marker.targetMeters / 1000).toFixed(1)}KM`
             : `G228 ${marker.targetMeters}M`;
+      }
+    }
+
+    // G228 Coastal Highway Overhead Directional Gantries recycling
+    for (const gantry of this.overheadGantries) {
+      if (gantry.position.z > this.playerZ + 85) {
+        gantry.position.z -= 2 * 1000;
       }
     }
 
