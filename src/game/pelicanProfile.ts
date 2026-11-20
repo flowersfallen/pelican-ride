@@ -32,6 +32,7 @@ export function createRandomPelicanIdentity(): PelicanIdentity {
     scarfColor: pick(SCARF_COLORS),
     frameColor: pick(FRAME_COLORS),
     accentColor: pick(ACCENT_COLORS),
+    bellTone: pick(['brass', 'vintage_horn', 'electronic', 'conch'] as const),
   };
 }
 

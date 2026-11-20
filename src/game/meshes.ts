@@ -21,6 +21,7 @@ export interface PelicanRig {
   taillightMesh?: THREE.Mesh;
   hatGroup?: THREE.Group;
   bikeComputer?: THREE.Group;
+  updateOdometer?: (speedKmh: number, cadenceRpm: number, isBoosted: boolean) => void;
   updateCustomization?: (patch: Partial<PelicanIdentity>) => void;
 }
 
@@ -212,7 +213,7 @@ export function createPelicanRiderMesh(
     handlebarGroup.add(grip);
   });
 
-  // Miniature GPS cycling computer mounted on handlebar stem
+  // Miniature GPS cycling computer mounted on handlebar stem with live digital display
   const computerGroup = new THREE.Group();
   computerGroup.position.set(0, 0.26, 0.02);
   const compCase = new THREE.Mesh(
@@ -220,14 +221,68 @@ export function createPelicanRiderMesh(
     new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.35, flatShading: true }),
   );
   computerGroup.add(compCase);
+
+  const compCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+  let compTexture: THREE.CanvasTexture | null = null;
+  let compCtx: CanvasRenderingContext2D | null = null;
+  if (compCanvas) {
+    compCanvas.width = 128;
+    compCanvas.height = 80;
+    compCtx = compCanvas.getContext('2d');
+    if (compCtx) {
+      compCtx.fillStyle = '#090d16';
+      compCtx.fillRect(0, 0, 128, 80);
+      compCtx.fillStyle = '#38bdf8';
+      compCtx.font = 'bold 15px sans-serif';
+      compCtx.textAlign = 'center';
+      compCtx.fillText('GPS ● SPD', 64, 18);
+      compCtx.fillStyle = '#4ade80';
+      compCtx.font = 'bold 38px monospace';
+      compCtx.fillText('28', 64, 54);
+      compCtx.fillStyle = '#94a3b8';
+      compCtx.font = '13px monospace';
+      compCtx.fillText('KM/H', 64, 72);
+    }
+    compTexture = new THREE.CanvasTexture(compCanvas);
+  }
+
   const compScreen = new THREE.Mesh(
     new THREE.PlaneGeometry(0.082, 0.058),
-    new THREE.MeshBasicMaterial({ color: 0x38bdf8 }),
+    compTexture
+      ? new THREE.MeshBasicMaterial({ map: compTexture })
+      : new THREE.MeshBasicMaterial({ color: 0x38bdf8 }),
   );
   compScreen.rotation.x = -Math.PI / 2.5;
   compScreen.position.set(0, 0.018, 0);
   computerGroup.add(compScreen);
   handlebarGroup.add(computerGroup);
+
+  let lastDispSpeed = -1;
+  let lastDispBoost = false;
+  const updateOdometer = (speedKmh: number, cadenceRpm: number, isBoosted: boolean) => {
+    if (!compCtx || !compCanvas || !compTexture) return;
+    if (speedKmh === lastDispSpeed && isBoosted === lastDispBoost) return;
+    lastDispSpeed = speedKmh;
+    lastDispBoost = isBoosted;
+
+    compCtx.fillStyle = '#090d16';
+    compCtx.fillRect(0, 0, 128, 80);
+
+    compCtx.fillStyle = isBoosted ? '#facc15' : '#38bdf8';
+    compCtx.font = 'bold 15px sans-serif';
+    compCtx.textAlign = 'center';
+    compCtx.fillText(isBoosted ? '⚡ BOOST' : 'GPS ● SPD', 64, 18);
+
+    compCtx.fillStyle = isBoosted ? '#fef08a' : speedKmh > 48 ? '#f43f5e' : '#4ade80';
+    compCtx.font = 'bold 38px monospace';
+    compCtx.fillText(String(Math.max(0, speedKmh)), 64, 54);
+
+    compCtx.fillStyle = '#94a3b8';
+    compCtx.font = '13px monospace';
+    compCtx.fillText(`KM/H ${cadenceRpm}RPM`, 64, 72);
+
+    compTexture.needsUpdate = true;
+  };
 
   // Wicker front basket with a cute fish peeking out
   const basketMat = new THREE.MeshStandardMaterial({
@@ -510,6 +565,7 @@ export function createPelicanRiderMesh(
     taillightMesh,
     hatGroup,
     bikeComputer: computerGroup,
+    updateOdometer,
     updateCustomization,
   };
 }
@@ -1404,6 +1460,275 @@ export function createStarfield(): THREE.Points {
   return new THREE.Points(geo, mat);
 }
 
+export function createEveningStarMesh(): THREE.Mesh {
+  const geo = new THREE.OctahedronGeometry(1.4, 0);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xfef08a,
+    transparent: true,
+    opacity: 0,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(-65, 38, -190);
+  return mesh;
+}
+
+export function createCrescentMoonMesh(): THREE.Group {
+  const group = new THREE.Group();
+  const moonShape = new THREE.Shape();
+  // Outer arc
+  moonShape.absarc(0, 0, 2.6, -Math.PI / 2, Math.PI / 2, false);
+  // Inner arc subtracting to form crescent
+  moonShape.absarc(0.95, 0, 2.2, Math.PI / 2, -Math.PI / 2, true);
+
+  const extrudeSettings = {
+    depth: 0.35,
+    bevelEnabled: true,
+    bevelSegments: 2,
+    steps: 1,
+    bevelSize: 0.08,
+    bevelThickness: 0.08,
+  };
+
+  const geo = new THREE.ExtrudeGeometry(moonShape, extrudeSettings);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xfef08a, // Soft warm pale lunar yellow
+    transparent: true,
+    opacity: 0,
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.y = Math.PI * 0.15;
+  mesh.rotation.z = -Math.PI * 0.08;
+  group.add(mesh);
+
+  // Soft lunar halo glow
+  const haloGeo = new THREE.RingGeometry(2.5, 4.2, 24);
+  const haloMat = new THREE.MeshBasicMaterial({
+    color: 0x38bdf8,
+    transparent: true,
+    opacity: 0,
+    side: THREE.DoubleSide,
+  });
+  const halo = new THREE.Mesh(haloGeo, haloMat);
+  halo.position.z = -0.15;
+  group.add(halo);
+
+  group.position.set(-78, 52, -220);
+  return group;
+}
+
+export function createRumbleStripMesh(): THREE.Group {
+  const group = new THREE.Group();
+  const stripeMat = new THREE.MeshStandardMaterial({
+    color: 0xfacc15, // High-visibility highway yellow
+    roughness: 0.5,
+    flatShading: true,
+  });
+  const stripeGeo = new THREE.BoxGeometry(12.4, 0.06, 0.22);
+  // 5 parallel raised thermo-plastic rumble stripes
+  for (let i = 0; i < 5; i++) {
+    const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+    stripe.position.set(0, 0.03, (i - 2) * 0.55);
+    group.add(stripe);
+  }
+  return group;
+}
+
+export function createOverheadGantryRig(roadHalfWidth = 6.2): THREE.Group {
+  const group = new THREE.Group();
+
+  const steelMat = new THREE.MeshStandardMaterial({
+    color: 0x94a3b8, // Galvanized highway steel
+    metalness: 0.6,
+    roughness: 0.4,
+    flatShading: true,
+  });
+
+  const columnGeo = new THREE.BoxGeometry(0.35, 5.4, 0.35);
+  const leftCol = new THREE.Mesh(columnGeo, steelMat);
+  leftCol.position.set(-roadHalfWidth - 1.0, 2.7, 0);
+  leftCol.castShadow = true;
+  group.add(leftCol);
+
+  const rightCol = new THREE.Mesh(columnGeo, steelMat);
+  rightCol.position.set(roadHalfWidth + 1.0, 2.7, 0);
+  rightCol.castShadow = true;
+  group.add(rightCol);
+
+  // Cross truss beam bridging over the road
+  const beamGeo = new THREE.BoxGeometry((roadHalfWidth + 1.0) * 2 + 0.4, 0.45, 0.45);
+  const beam = new THREE.Mesh(beamGeo, steelMat);
+  beam.position.set(0, 5.1, 0);
+  beam.castShadow = true;
+  group.add(beam);
+
+  // Signboard canvas
+  const signCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+  if (signCanvas) {
+    signCanvas.width = 512;
+    signCanvas.height = 160;
+    const sCtx = signCanvas.getContext('2d');
+    if (sCtx) {
+      sCtx.fillStyle = '#047857'; // Highway green
+      sCtx.fillRect(0, 0, 512, 160);
+      sCtx.strokeStyle = '#ffffff';
+      sCtx.lineWidth = 8;
+      sCtx.strokeRect(8, 8, 496, 144);
+      sCtx.fillStyle = '#ffffff';
+      sCtx.font = 'bold 36px sans-serif';
+      sCtx.textAlign = 'center';
+      sCtx.fillText('G228 平潭沿海国家观光道', 256, 56);
+      sCtx.font = 'bold 24px sans-serif';
+      sCtx.fillStyle = '#fde047';
+      sCtx.fillText('望潮湾 450M ↗   海角天涯 1950M ↑   限速 60', 256, 114);
+    }
+    const signTexture = new THREE.CanvasTexture(signCanvas);
+    const signGeo = new THREE.BoxGeometry(7.6, 1.8, 0.08);
+    const signMesh = new THREE.Mesh(
+      signGeo,
+      new THREE.MeshBasicMaterial({ map: signTexture }),
+    );
+    signMesh.position.set(0, 4.2, 0);
+    group.add(signMesh);
+  }
+
+  return group;
+}
+
+export function createFinishArchRig(roadHalfWidth = 6.2): THREE.Group {
+  const group = new THREE.Group();
+
+  const pillarMatRed = new THREE.MeshStandardMaterial({
+    color: 0xef4444, // Racing red
+    roughness: 0.4,
+    flatShading: true,
+  });
+  const pillarMatWhite = new THREE.MeshStandardMaterial({
+    color: 0xf8fafc, // Clean white
+    roughness: 0.4,
+    flatShading: true,
+  });
+
+  const spanWidth = (roadHalfWidth + 0.8) * 2;
+  const archHeight = 5.2;
+
+  // Left & right curved inflatable columns with striped segments
+  [-roadHalfWidth - 0.8, roadHalfWidth + 0.8].forEach((xPos) => {
+    for (let s = 0; s < 6; s++) {
+      const segGeo = new THREE.CylinderGeometry(0.42, 0.45, 0.9, 10);
+      const segMesh = new THREE.Mesh(segGeo, s % 2 === 0 ? pillarMatRed : pillarMatWhite);
+      segMesh.position.set(xPos, 0.45 + s * 0.85, 0);
+      segMesh.castShadow = true;
+      group.add(segMesh);
+    }
+  });
+
+  // Cross arch beam
+  const beamGeo = new THREE.CylinderGeometry(0.42, 0.42, spanWidth + 0.8, 12);
+  const beamMat = new THREE.MeshStandardMaterial({
+    color: 0xef4444,
+    roughness: 0.4,
+    flatShading: true,
+  });
+  const crossBeam = new THREE.Mesh(beamGeo, beamMat);
+  crossBeam.rotation.z = Math.PI / 2;
+  crossBeam.position.set(0, archHeight, 0);
+  crossBeam.castShadow = true;
+  group.add(crossBeam);
+
+  // Checkerboard finish line hanging banner
+  const bannerCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+  if (bannerCanvas) {
+    bannerCanvas.width = 512;
+    bannerCanvas.height = 160;
+    const bCtx = bannerCanvas.getContext('2d');
+    if (bCtx) {
+      bCtx.fillStyle = '#0f172a';
+      bCtx.fillRect(0, 0, 512, 160);
+
+      const checkSize = 16;
+      for (let cx = 0; cx < 512; cx += checkSize) {
+        for (let cy = 0; cy < 160; cy += checkSize) {
+          if (cy < 20 || cy > 140) {
+            bCtx.fillStyle = (Math.floor(cx / checkSize) + Math.floor(cy / checkSize)) % 2 === 0 ? '#ffffff' : '#0f172a';
+            bCtx.fillRect(cx, cy, checkSize, checkSize);
+          }
+        }
+      }
+
+      bCtx.fillStyle = '#facc15';
+      bCtx.font = 'bold 36px sans-serif';
+      bCtx.textAlign = 'center';
+      bCtx.fillText('🏁 G228 海岸国家观光道 · 3000M 🏁', 256, 75);
+      bCtx.font = 'bold 22px sans-serif';
+      bCtx.fillStyle = '#ffffff';
+      bCtx.fillText('FINISH LINE · 百里巡礼终点', 256, 118);
+    }
+    const bannerTexture = new THREE.CanvasTexture(bannerCanvas);
+    const bannerGeo = new THREE.BoxGeometry(8.2, 1.8, 0.08);
+    const bannerMesh = new THREE.Mesh(
+      bannerGeo,
+      new THREE.MeshBasicMaterial({ map: bannerTexture }),
+    );
+    bannerMesh.position.set(0, archHeight - 0.95, 0);
+    group.add(bannerMesh);
+  }
+
+  // Road tarmac finish line checkerboard stripe across the highway surface
+  const stripeGeo = new THREE.BoxGeometry(spanWidth - 1.2, 0.02, 1.2);
+  const stripeCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+  if (stripeCanvas) {
+    stripeCanvas.width = 256;
+    stripeCanvas.height = 32;
+    const sCtx = stripeCanvas.getContext('2d');
+    if (sCtx) {
+      const sq = 16;
+      for (let x = 0; x < 256; x += sq) {
+        for (let y = 0; y < 32; y += sq) {
+          sCtx.fillStyle = (Math.floor(x / sq) + Math.floor(y / sq)) % 2 === 0 ? '#ffffff' : '#0f172a';
+          sCtx.fillRect(x, y, sq, sq);
+        }
+      }
+    }
+    const stripeTexture = new THREE.CanvasTexture(stripeCanvas);
+    const groundFinishStripe = new THREE.Mesh(
+      stripeGeo,
+      new THREE.MeshBasicMaterial({ map: stripeTexture }),
+    );
+    groundFinishStripe.position.set(0, 0.015, 0);
+    group.add(groundFinishStripe);
+  }
+
+  return group;
+}
+
+export interface PerchedSeagullRig {
+  group: THREE.Group;
+  leftWing: THREE.Mesh;
+  rightWing: THREE.Mesh;
+  baseZ: number;
+  isFleeing: boolean;
+  fleeTimer: number;
+  flapPhase: number;
+}
+
+export function createPerchedSeagullMesh(): PerchedSeagullRig {
+  const rig = createSeagullMesh();
+  rig.group.scale.setScalar(0.85);
+  // Wings folded down at sides when perched
+  rig.leftWing.rotation.z = -0.45;
+  rig.rightWing.rotation.z = 0.45;
+  return {
+    group: rig.group,
+    leftWing: rig.leftWing,
+    rightWing: rig.rightWing,
+    baseZ: -35,
+    isFleeing: false,
+    fleeTimer: 0,
+    flapPhase: 0,
+  };
+}
+
 export function createRoadSignMesh(
   type: 'highway' | 'tsunami_evac' | 'scenic_route',
 ): THREE.Group {
@@ -2047,5 +2372,549 @@ export function createViewpointPavilionRig(name: string): ViewpointPavilionRig {
     lanternLight: lantern,
     windChime: chime,
     viewpointName: name,
+  };
+}
+
+export interface RainbowRig {
+  group: THREE.Group;
+  bands: THREE.Mesh[];
+  opacity: number;
+  targetOpacity: number;
+}
+
+export function createRainbowRig(): RainbowRig {
+  const group = new THREE.Group();
+  const bands: THREE.Mesh[] = [];
+
+  // 7 spectral colors: Red, Orange, Yellow, Green, Cyan, Blue, Violet
+  const colors = [
+    0xef4444, // Red
+    0xf97316, // Orange
+    0xfacc15, // Yellow
+    0x22c55e, // Green
+    0x06b6d4, // Cyan
+    0x3b82f6, // Blue
+    0x8b5cf6, // Violet
+  ];
+
+  const baseRadius = 38;
+  const bandThickness = 0.55;
+  const segments = 48;
+
+  // Build curved half-torus rainbow arc
+  colors.forEach((col, idx) => {
+    const r = baseRadius - idx * bandThickness;
+    const geo = new THREE.TorusGeometry(r, bandThickness * 0.48, 6, segments, Math.PI);
+    const mat = new THREE.MeshBasicMaterial({
+      color: col,
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.y = -3.0; // Anchored slightly below ground/sea level
+    group.add(mesh);
+    bands.push(mesh);
+  });
+
+  return {
+    group,
+    bands,
+    opacity: 0,
+    targetOpacity: 0,
+  };
+}
+
+export interface BeachCampsiteRig {
+  group: THREE.Group;
+  fireFlame: THREE.Mesh;
+  fireLight: THREE.PointLight;
+  smokeTimer: number;
+}
+
+export function createBeachCampsiteRig(): BeachCampsiteRig {
+  const group = new THREE.Group();
+
+  const canvasMat = new THREE.MeshStandardMaterial({
+    color: 0xfef08a, // Warm cream canvas
+    roughness: 0.9,
+    flatShading: true,
+  });
+  const tentMat2 = new THREE.MeshStandardMaterial({
+    color: 0x0284c7, // Coastal azure tent
+    roughness: 0.85,
+    flatShading: true,
+  });
+  const woodMat = new THREE.MeshStandardMaterial({
+    color: 0x78350f,
+    roughness: 0.8,
+  });
+  const stoneMat = new THREE.MeshStandardMaterial({
+    color: 0x64748b,
+    roughness: 0.9,
+    flatShading: true,
+  });
+  const charcoalMat = new THREE.MeshStandardMaterial({
+    color: 0x1e293b,
+    roughness: 0.95,
+  });
+
+  // Main A-frame Tent
+  const tent1 = new THREE.Group();
+  const tentPrism = new THREE.Mesh(new THREE.ConeGeometry(1.8, 2.2, 4), canvasMat);
+  tentPrism.rotation.y = Math.PI / 4;
+  tentPrism.position.y = 1.1;
+  tentPrism.scale.set(1.1, 1, 1.6);
+  tentPrism.castShadow = true;
+  tent1.add(tentPrism);
+
+  // Tent wooden ridge pole
+  const ridgePole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 3.2, 6), woodMat);
+  ridgePole.rotation.x = Math.PI / 2;
+  ridgePole.position.set(0, 2.2, 0);
+  tent1.add(ridgePole);
+  tent1.position.set(-1.8, 0, 0.8);
+  group.add(tent1);
+
+  // Second smaller popup dome tent
+  const tent2 = new THREE.Mesh(new THREE.SphereGeometry(1.1, 6, 5, 0, Math.PI * 2, 0, Math.PI * 0.5), tentMat2);
+  tent2.position.set(2.2, 0, -1.2);
+  tent2.scale.set(1.2, 1, 1.2);
+  tent2.castShadow = true;
+  group.add(tent2);
+
+  // Stone Fire Pit Ring
+  const firePit = new THREE.Group();
+  const stoneCount = 8;
+  for (let i = 0; i < stoneCount; i++) {
+    const angle = (i / stoneCount) * Math.PI * 2;
+    const stone = new THREE.Mesh(new THREE.DodecahedronGeometry(0.18, 0), stoneMat);
+    stone.position.set(Math.cos(angle) * 0.72, 0.1, Math.sin(angle) * 0.72);
+    firePit.add(stone);
+  }
+
+  // Charcoal base
+  const charcoal = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.08, 8), charcoalMat);
+  charcoal.position.y = 0.04;
+  firePit.add(charcoal);
+
+  // Crossing campfire logs
+  for (let angle of [0.3, 1.4, 2.5]) {
+    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.95, 6), woodMat);
+    log.rotation.z = Math.PI / 2;
+    log.rotation.y = angle;
+    log.position.y = 0.12;
+    firePit.add(log);
+  }
+
+  // Jumping bonfire flame
+  const flameMat = new THREE.MeshBasicMaterial({
+    color: 0xf97316,
+    transparent: true,
+    opacity: 0.95,
+  });
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.75, 6), flameMat);
+  flame.position.y = 0.42;
+  firePit.add(flame);
+
+  // Warm glowing point light
+  const fireLight = new THREE.PointLight(0xf59e0b, 1.8, 12, 1.5);
+  fireLight.position.set(0, 0.65, 0);
+  firePit.add(fireLight);
+
+  firePit.position.set(0, 0, 0);
+  group.add(firePit);
+
+  // Camping beach folding chair
+  const chair = new THREE.Group();
+  const seatMat = new THREE.MeshStandardMaterial({ color: 0x059669, roughness: 0.8 });
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.05, 0.65), seatMat);
+  seat.position.y = 0.45;
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.6, 0.05), seatMat);
+  back.position.set(0, 0.72, -0.3);
+  chair.add(seat, back);
+  chair.position.set(0.2, 0, 2.1);
+  chair.rotation.y = -Math.PI * 0.85;
+  group.add(chair);
+
+  return {
+    group,
+    fireFlame: flame,
+    fireLight,
+    smokeTimer: 0,
+  };
+}
+
+export interface CoconutKioskRig {
+  group: THREE.Group;
+  baseZ: number;
+}
+
+export function createCoconutKioskRig(): CoconutKioskRig {
+  const group = new THREE.Group();
+
+  const woodMat = new THREE.MeshStandardMaterial({
+    color: 0x78350f, // Weathered timber
+    roughness: 0.85,
+    flatShading: true,
+  });
+
+  const bambooMat = new THREE.MeshStandardMaterial({
+    color: 0xa16207, // Golden bamboo
+    roughness: 0.75,
+    flatShading: true,
+  });
+
+  const thatchMat = new THREE.MeshStandardMaterial({
+    color: 0x65a30d, // Palm frond green-gold thatch
+    roughness: 0.95,
+    flatShading: true,
+  });
+
+  // 4 corner timber posts
+  const postGeo = new THREE.CylinderGeometry(0.12, 0.14, 3.2, 6);
+  const postOffsets = [
+    [-1.6, -1.2],
+    [1.6, -1.2],
+    [-1.6, 1.2],
+    [1.6, 1.2],
+  ];
+  postOffsets.forEach(([px, pz]) => {
+    const post = new THREE.Mesh(postGeo, woodMat);
+    post.position.set(px, 1.6, pz);
+    post.castShadow = true;
+    group.add(post);
+  });
+
+  // Raised wooden plank floor
+  const floorGeo = new THREE.BoxGeometry(3.6, 0.2, 2.8);
+  const floor = new THREE.Mesh(floorGeo, woodMat);
+  floor.position.set(0, 0.1, 0);
+  floor.receiveShadow = true;
+  group.add(floor);
+
+  // Thatched canopy roof (tiered overhang)
+  const roofTier1 = new THREE.Mesh(new THREE.ConeGeometry(3.2, 1.4, 4), thatchMat);
+  roofTier1.position.set(0, 3.6, 0);
+  roofTier1.rotation.y = Math.PI * 0.25;
+  roofTier1.castShadow = true;
+  group.add(roofTier1);
+
+  const roofTier2 = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1.1, 4), thatchMat);
+  roofTier2.position.set(0, 4.2, 0);
+  roofTier2.rotation.y = Math.PI * 0.25;
+  roofTier2.castShadow = true;
+  group.add(roofTier2);
+
+  // Serving counter bar facing the road
+  const counterGeo = new THREE.BoxGeometry(2.8, 1.05, 0.55);
+  const counter = new THREE.Mesh(counterGeo, bambooMat);
+  counter.position.set(-1.0, 0.7, 0);
+  counter.castShadow = true;
+  group.add(counter);
+
+  // 3 fresh green coconuts with colorful straws on the counter
+  const cocoMat = new THREE.MeshStandardMaterial({
+    color: 0x22c55e, // Fresh tropical green
+    roughness: 0.6,
+    flatShading: true,
+  });
+  const strawMat = new THREE.MeshStandardMaterial({
+    color: 0xf43f5e, // Coral pink straw
+    roughness: 0.3,
+  });
+
+  for (let c = 0; c < 3; c++) {
+    const coco = new THREE.Mesh(new THREE.SphereGeometry(0.16, 7, 6), cocoMat);
+    coco.scale.set(1, 1.15, 1);
+    coco.position.set(-1.0, 1.34, (c - 1) * 0.45);
+    coco.castShadow = true;
+    group.add(coco);
+
+    const straw = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.22, 5), strawMat);
+    straw.rotation.z = 0.25;
+    straw.position.set(-1.03, 1.5, (c - 1) * 0.45);
+    group.add(straw);
+  }
+
+  // Wooden hanging sign with canvas text: "海风椰青"
+  const signCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+  if (signCanvas) {
+    signCanvas.width = 256;
+    signCanvas.height = 96;
+    const sCtx = signCanvas.getContext('2d');
+    if (sCtx) {
+      sCtx.fillStyle = '#78350f';
+      sCtx.fillRect(0, 0, 256, 96);
+      sCtx.strokeStyle = '#fef08a';
+      sCtx.lineWidth = 6;
+      sCtx.strokeRect(6, 6, 244, 84);
+      sCtx.fillStyle = '#fef08a';
+      sCtx.font = 'bold 34px sans-serif';
+      sCtx.textAlign = 'center';
+      sCtx.fillText('🥥 海风椰青', 128, 48);
+      sCtx.font = 'bold 18px sans-serif';
+      sCtx.fillStyle = '#86efac';
+      sCtx.fillText('100% 冰镇海岛电解质', 128, 76);
+    }
+    const signTexture = new THREE.CanvasTexture(signCanvas);
+    const signGeo = new THREE.BoxGeometry(0.08, 0.65, 1.6);
+    const signMesh = new THREE.Mesh(
+      signGeo,
+      new THREE.MeshBasicMaterial({ map: signTexture }),
+    );
+    signMesh.position.set(-1.55, 2.7, 0);
+    group.add(signMesh);
+  }
+
+  // Crate of coconuts on the ground beside the kiosk
+  const crateGeo = new THREE.BoxGeometry(0.7, 0.4, 0.7);
+  const crate = new THREE.Mesh(crateGeo, woodMat);
+  crate.position.set(0.6, 0.2, 0.8);
+  group.add(crate);
+
+  for (let i = 0; i < 4; i++) {
+    const crateCoco = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 5), cocoMat);
+    crateCoco.position.set(
+      0.6 + ((i % 2) - 0.5) * 0.25,
+      0.46,
+      0.8 + (Math.floor(i / 2) - 0.5) * 0.25,
+    );
+    group.add(crateCoco);
+  }
+
+  return { group, baseZ: 0 };
+}
+
+export function createCoconutPickupMesh(): THREE.Group {
+  const group = new THREE.Group();
+
+  const cocoMat = new THREE.MeshStandardMaterial({
+    color: 0x16a34a,
+    roughness: 0.5,
+    flatShading: true,
+  });
+  const coco = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 7), cocoMat);
+  coco.scale.set(1, 1.15, 1);
+  group.add(coco);
+
+  // Clipped top coconut opening with white coconut meat
+  const meatMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const meat = new THREE.Mesh(new THREE.CircleGeometry(0.12, 8), meatMat);
+  meat.rotation.x = -Math.PI / 2;
+  meat.position.y = 0.27;
+  group.add(meat);
+
+  // Straw
+  const strawMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
+  const straw = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.35, 6), strawMat);
+  straw.rotation.z = 0.35;
+  straw.position.set(-0.04, 0.4, 0);
+  group.add(straw);
+
+  // Hydration turquoise aura ring
+  const ringGeo = new THREE.RingGeometry(0.35, 0.45, 16);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0x38bdf8,
+    transparent: true,
+    opacity: 0.7,
+    side: THREE.DoubleSide,
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = -Math.PI / 2;
+  group.add(ring);
+
+  return group;
+}
+
+export interface WindsockRig {
+  group: THREE.Group;
+  sockPivot: THREE.Group;
+  sockCloth: THREE.Group;
+  baseZ: number;
+}
+
+export function createWindsockRig(): WindsockRig {
+  const group = new THREE.Group();
+
+  const metalMat = new THREE.MeshStandardMaterial({
+    color: 0x94a3b8,
+    metalness: 0.8,
+    roughness: 0.3,
+  });
+  const redMat = new THREE.MeshStandardMaterial({
+    color: 0xef4444, // Bright red
+    roughness: 0.7,
+    flatShading: true,
+  });
+  const whiteMat = new THREE.MeshStandardMaterial({
+    color: 0xf8fafc, // Clean white
+    roughness: 0.7,
+    flatShading: true,
+  });
+
+  // Vertical steel mast pole
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 3.8, 8), metalMat);
+  pole.position.y = 1.9;
+  pole.castShadow = true;
+  group.add(pole);
+
+  // Top swivel mount collar
+  const mount = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), metalMat);
+  mount.position.y = 3.8;
+  group.add(mount);
+
+  // Swiveling sock pivot
+  const sockPivot = new THREE.Group();
+  sockPivot.position.y = 3.75;
+
+  // Swivel hoop / collar ring
+  const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.02, 6, 12), metalMat);
+  hoop.rotation.y = Math.PI / 2;
+  sockPivot.add(hoop);
+
+  // Segmented red/white windsock cone
+  const sockCloth = new THREE.Group();
+  const segmentCount = 5;
+  const sockLength = 1.4;
+  const segLen = sockLength / segmentCount;
+
+  for (let i = 0; i < segmentCount; i++) {
+    const rTop = 0.18 * (1 - i * 0.14);
+    const rBottom = 0.18 * (1 - (i + 1) * 0.14);
+    const segGeo = new THREE.CylinderGeometry(rBottom, rTop, segLen, 8, 1, true);
+    const segMesh = new THREE.Mesh(segGeo, i % 2 === 0 ? redMat : whiteMat);
+    segMesh.rotation.z = Math.PI / 2;
+    segMesh.position.x = (i + 0.5) * segLen;
+    sockCloth.add(segMesh);
+  }
+
+  sockPivot.add(sockCloth);
+  group.add(sockPivot);
+
+  return {
+    group,
+    sockPivot,
+    sockCloth,
+    baseZ: -50,
+  };
+}
+
+export interface WhaleRig {
+  group: THREE.Group;
+  tailFluke: THREE.Group;
+  flipperLeft: THREE.Group;
+  flipperRight: THREE.Group;
+  jumpTimer: number;
+  isJumping: boolean;
+  jumpCycleTime: number;
+  baseX: number;
+  baseZ: number;
+  hasSpouted: boolean;
+}
+
+export function createWhaleMesh(): WhaleRig {
+  const group = new THREE.Group();
+
+  // Low-poly deep ocean humpback whale materials
+  const whaleSkinMat = new THREE.MeshStandardMaterial({
+    color: 0x1e293b, // Deep slate navy
+    roughness: 0.35,
+    metalness: 0.15,
+    flatShading: true,
+  });
+  const bellyMat = new THREE.MeshStandardMaterial({
+    color: 0x94a3b8, // Light misty slate underbelly
+    roughness: 0.45,
+    flatShading: true,
+  });
+
+  // Main Torso (massive rounded streamlined body)
+  const bodyGeo = new THREE.ConeGeometry(1.6, 6.2, 8);
+  const body = new THREE.Mesh(bodyGeo, whaleSkinMat);
+  body.rotation.x = Math.PI / 2;
+  body.castShadow = true;
+  group.add(body);
+
+  // Large rounded head / rostrum
+  const headGeo = new THREE.SphereGeometry(1.5, 8, 7);
+  const head = new THREE.Mesh(headGeo, whaleSkinMat);
+  head.scale.set(1.0, 0.85, 1.4);
+  head.position.set(0, 0.05, -3.2);
+  group.add(head);
+
+  // Underbelly ventral pleats
+  const belly = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.1, 4.0, 7), bellyMat);
+  belly.rotation.x = Math.PI / 2;
+  belly.position.set(0, -0.45, -1.2);
+  belly.scale.set(0.9, 0.5, 1.0);
+  group.add(belly);
+
+  // Dorsal fin / hump
+  const dorsal = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.1, 5), whaleSkinMat);
+  dorsal.position.set(0, 1.45, 0.8);
+  dorsal.rotation.x = -0.55;
+  group.add(dorsal);
+
+  // Pectoral flippers
+  const flipperGeo = new THREE.BoxGeometry(0.35, 0.12, 2.2);
+  const flipperLeft = new THREE.Group();
+  const leftMesh = new THREE.Mesh(flipperGeo, whaleSkinMat);
+  leftMesh.position.set(-1.1, 0, 0.8);
+  leftMesh.rotation.y = -0.35;
+  leftMesh.rotation.z = -0.4;
+  flipperLeft.position.set(-1.2, -0.3, -1.2);
+  flipperLeft.add(leftMesh);
+  group.add(flipperLeft);
+
+  const flipperRight = new THREE.Group();
+  const rightMesh = new THREE.Mesh(flipperGeo, whaleSkinMat);
+  rightMesh.position.set(1.1, 0, 0.8);
+  rightMesh.rotation.y = 0.35;
+  rightMesh.rotation.z = 0.4;
+  flipperRight.position.set(1.2, -0.3, -1.2);
+  flipperRight.add(rightMesh);
+  group.add(flipperRight);
+
+  // Articulated tail fluke
+  const tailFluke = new THREE.Group();
+  tailFluke.position.set(0, 0.1, 3.1);
+
+  const tailStem = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 1.1, 2.4, 7), whaleSkinMat);
+  tailStem.rotation.x = Math.PI / 2;
+  tailStem.position.set(0, 0, 1.2);
+  tailFluke.add(tailStem);
+
+  // Broad majestic caudal fluke wings
+  const flukeWing = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.14, 1.1), whaleSkinMat);
+  flukeWing.position.set(0, 0, 2.4);
+  flukeWing.rotation.x = -0.15;
+  tailFluke.add(flukeWing);
+
+  group.add(tailFluke);
+
+  // Blowhole indicator
+  const blowhole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.18, 0.22, 0.1, 8),
+    new THREE.MeshBasicMaterial({ color: 0x0f172a }),
+  );
+  blowhole.position.set(0, 1.18, -2.4);
+  group.add(blowhole);
+
+  group.scale.setScalar(1.6);
+  group.position.y = -6.0; // Initially deep underwater
+
+  return {
+    group,
+    tailFluke,
+    flipperLeft,
+    flipperRight,
+    jumpTimer: Math.random() * 15,
+    isJumping: false,
+    jumpCycleTime: 24 + Math.random() * 14,
+    baseX: -52 - Math.random() * 18,
+    baseZ: -120,
+    hasSpouted: false,
   };
 }

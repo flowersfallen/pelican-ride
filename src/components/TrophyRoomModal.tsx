@@ -30,6 +30,15 @@ const ALL_ACHIEVEMENT_IDS: AchievementId[] = [
   'seagull_escort',
   'blue_tears',
   'coastal_milestone',
+  'coastal_rainbow',
+  'tailwind_rider',
+  'twilight_dreamer',
+  'peloton_spirit',
+  'ocean_whale',
+  'century_rider',
+  'bonfire_gatherer',
+  'grand_tour_master',
+  'coconut_refresh',
 ];
 
 export function TrophyRoomModal({ hud, onClose }: TrophyRoomModalProps) {

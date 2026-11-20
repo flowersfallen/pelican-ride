@@ -25,15 +25,33 @@ import {
   createWindTurbineMesh,
   createMilestoneMarkerRig,
   createViewpointPavilionRig,
+  createBeachCampsiteRig,
+  createCoconutKioskRig,
+  createCoconutPickupMesh,
+  createEveningStarMesh,
+  createCrescentMoonMesh,
+  createRumbleStripMesh,
+  createOverheadGantryRig,
+  createFinishArchRig,
+  createPerchedSeagullMesh,
+  createRainbowRig,
+  createWindsockRig,
+  createWhaleMesh,
+  BeachCampsiteRig,
+  CoconutKioskRig,
   DolphinRig,
   LighthouseRig,
   MilestoneMarkerRig,
   PelicanRig,
+  PerchedSeagullRig,
+  RainbowRig,
   SeagullRig,
   TrafficConeRig,
   TsunamiRig,
   TurtleRig,
   ViewpointPavilionRig,
+  WhaleRig,
+  WindsockRig,
   WindTurbineRig,
 } from './meshes';
 import {
@@ -71,6 +89,75 @@ interface CompanionEntity {
   z: number;
   speedOffset: number;
   pedalPhase: number;
+  speechSprite?: THREE.Sprite;
+  speechTimer?: number;
+  speechCanvas?: HTMLCanvasElement;
+  speechCtx?: CanvasRenderingContext2D | null;
+  speechTexture?: THREE.CanvasTexture;
+}
+
+function drawSpeechBubbleOnCanvas(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  texture: THREE.CanvasTexture,
+  text: string,
+): void {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const w = canvas.width;
+  const h = canvas.height;
+  const pad = 10;
+  const bubbleH = h - 36;
+  const r = 20;
+
+  // Background rounded box with subtle drop shadow
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 6;
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+  ctx.beginPath();
+  ctx.moveTo(pad + r, pad);
+  ctx.lineTo(w - pad - r, pad);
+  ctx.quadraticCurveTo(w - pad, pad, w - pad, pad + r);
+  ctx.lineTo(w - pad, bubbleH - r);
+  ctx.quadraticCurveTo(w - pad, bubbleH, w - pad - r, bubbleH);
+  ctx.lineTo(pad + r, bubbleH);
+  ctx.quadraticCurveTo(pad, bubbleH, pad, bubbleH - r);
+  ctx.lineTo(pad, pad + r);
+  ctx.quadraticCurveTo(pad, pad, pad + r, pad);
+  ctx.closePath();
+  ctx.fill();
+
+  // Vibrant cyan border
+  ctx.shadowColor = 'transparent';
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // Pointer tail pointing down towards pelican rider
+  const tailX = w * 0.5;
+  const tailY = bubbleH;
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+  ctx.beginPath();
+  ctx.moveTo(tailX - 16, tailY - 1);
+  ctx.lineTo(tailX, tailY + 28);
+  ctx.lineTo(tailX + 16, tailY - 1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // Text label
+  ctx.fillStyle = '#f8fafc';
+  ctx.font =
+    'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, w * 0.5, (pad + bubbleH) * 0.5);
+
+  ctx.restore();
+  texture.needsUpdate = true;
 }
 
 interface PopParticle {
@@ -219,6 +306,60 @@ export const ACHIEVEMENTS_DEF: Record<AchievementId, Achievement> = {
     desc: '沿 G228 沿海公路打卡突破 1,000 米里程碑与海角观景台！',
     icon: '🚩',
   },
+  coastal_rainbow: {
+    id: 'coastal_rainbow',
+    title: '碧海虹桥',
+    desc: '渡过滔天巨浪狂澜，见证晴空跨海而立的七彩长虹！',
+    icon: '🌈',
+  },
+  tailwind_rider: {
+    id: 'tailwind_rider',
+    title: '顺风使舵',
+    desc: '借海滨呼啸顺风飞驰，车速突破极限！',
+    icon: '💨',
+  },
+  twilight_dreamer: {
+    id: 'twilight_dreamer',
+    title: '落日余晖',
+    desc: '在金色晚霞与微风中静享海滨慢骑，突破 2,000 米里程！',
+    icon: '✨',
+  },
+  peloton_spirit: {
+    id: 'peloton_spirit',
+    title: '车队同心',
+    desc: '与同行车队完成气流破风与铃声互动，并肩穿越海风！',
+    icon: '🚴‍♂️',
+  },
+  ocean_whale: {
+    id: 'ocean_whale',
+    title: '巨鲸跃浪',
+    desc: '在浩瀚远海见证抹香巨鲸破浪跃出与壮阔喷泉！',
+    icon: '🐋',
+  },
+  century_rider: {
+    id: 'century_rider',
+    title: '百里破风',
+    desc: '沿 G228 沿海公路突破 3,000 米长途巡礼，座驾登顶【海角传说】！',
+    icon: '🏆',
+  },
+  bonfire_gatherer: {
+    id: 'bonfire_gatherer',
+    title: '海风营火',
+    desc: '在沙滩露营地伴着海风驻足听柴火噼啪，领略微光萤火虫！',
+    icon: '⛺',
+  },
+  grand_tour_master: {
+    id: 'grand_tour_master',
+    title: '海角大满贯',
+    desc: '集齐海洋战利品五大珍宝（鱼、虾、海星、海草、探照灯），达成海角大满贯！',
+    icon: '🌟',
+  },
+  coconut_refresh: {
+    id: 'coconut_refresh',
+    title: '海岛椰青',
+    desc: '在沿海公路驿站品尝冰镇鲜椰，注入满额电解质与清爽极速！',
+    icon: '🥥',
+  },
 };
 
 export class PelicanScene {
@@ -259,16 +400,36 @@ export class PelicanScene {
   private mountainRidge!: THREE.Group;
   private contactShadow!: THREE.Mesh;
   private starfield!: THREE.Points;
+  private eveningStar!: THREE.Mesh;
+  private crescentMoon!: THREE.Group;
+  private lunarReflectionMesh!: THREE.Mesh;
   private dolphins: DolphinRig[] = [];
+  private whales: WhaleRig[] = [];
+  private perchedGulls: PerchedSeagullRig[] = [];
+  private rumbleStrips: THREE.Group[] = [];
+  private passedRumbleStrips = new Set<number>();
   private roadSigns: THREE.Group[] = [];
+  private overheadGantries: THREE.Group[] = [];
+  private finishArch!: THREE.Group;
+  private finishArchCrossed = false;
   private jumpRamps: THREE.Group[] = [];
   private milestoneMarkers: MilestoneMarkerRig[] = [];
   private viewpointPavilions: ViewpointPavilionRig[] = [];
   private passedMilestones = new Set<number>();
   private passedViewpoints = new Set<string>();
+  private rainbowRig!: RainbowRig;
+  private rainbowPassed = false;
+  private beachCampsites: BeachCampsiteRig[] = [];
+  private passedCampsites = new Set<number>();
+  private coconutKiosks: CoconutKioskRig[] = [];
+  private coconutPickups: { group: THREE.Group; baseZ: number; collected: boolean }[] = [];
   private crabs: CrabRig[] = [];
   private trafficCones: TrafficConeRig[] = [];
   private windTurbines: WindTurbineRig[] = [];
+  private windsocks: WindsockRig[] = [];
+  private windSpeedKmh = 14;
+  private windAngleRad = 0.25;
+  private windDirectionLabel = '顺风';
   private skidMarks: THREE.Mesh[] = [];
   private rainRig!: { lineSegments: THREE.LineSegments; positions: Float32Array; count: number };
   private cameraMode: 'action' | 'chill' | 'drone' = 'action';
@@ -326,6 +487,8 @@ export class PelicanScene {
   private isDrafting = false;
   private draftingTimer = 0;
   private lastDraftingSoundTime = 0;
+  private lastDraftingSpeechTime = -999;
+  private pelotonInteractionCount = 0;
   private isFeverMode = false;
   private isPhotoMode = false;
   private photoCameraPreset: 'hero' | 'wide' | 'follow' | 'low' = 'hero';
@@ -738,12 +901,43 @@ export class PelicanScene {
     this.starfield = createStarfield();
     this.scene.add(this.starfield);
 
+    // Radiant Evening Star over the coastal sea horizon
+    this.eveningStar = createEveningStarMesh();
+    this.scene.add(this.eveningStar);
+
+    // Shimmering Crescent Moon in the deep coastal night sky
+    this.crescentMoon = createCrescentMoonMesh();
+    this.scene.add(this.crescentMoon);
+
+    // Lunar sea reflection ribbon on ocean surface
+    const lunarReflGeo = new THREE.PlaneGeometry(16, 90);
+    const lunarReflMat = new THREE.MeshBasicMaterial({
+      color: 0xfef08a,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
+    this.lunarReflectionMesh = new THREE.Mesh(lunarReflGeo, lunarReflMat);
+    this.lunarReflectionMesh.rotation.x = -Math.PI / 2;
+    this.lunarReflectionMesh.position.set(-58, 0.02, -180);
+    this.scene.add(this.lunarReflectionMesh);
+
     // Graceful Jumping Dolphins in deep coastal water
     for (let i = 0; i < 2; i++) {
       const dolphin = createDolphinMesh();
       dolphin.group.position.set(-46 - i * 16, -2, -65 - i * 55);
       this.dolphins.push(dolphin);
       this.scene.add(dolphin.group);
+    }
+
+    // Majestic Deep-Ocean Whales
+    for (let i = 0; i < 2; i++) {
+      const whale = createWhaleMesh();
+      whale.baseX = -54 - i * 18;
+      whale.baseZ = this.playerZ - 110 - i * 140;
+      whale.group.position.set(whale.baseX, -6.0, whale.baseZ);
+      this.whales.push(whale);
+      this.scene.add(whale.group);
     }
 
     // Coastal Highway 101, Tsunami Evacuation Route & Scenic Bike Signs
@@ -758,6 +952,20 @@ export class PelicanScene {
       this.roadSigns.push(sign);
       this.scene.add(sign);
     }
+
+    // G228 Coastal Highway Overhead Directional Gantries
+    const gantryPositions = [-1000, -2000];
+    for (const gz of gantryPositions) {
+      const gantry = createOverheadGantryRig(ROAD_HALF_WIDTH);
+      gantry.position.set(0, 0, gz);
+      this.overheadGantries.push(gantry);
+      this.scene.add(gantry);
+    }
+
+    // 3000M Grand Tour Finish Arch
+    this.finishArch = createFinishArchRig(ROAD_HALF_WIDTH);
+    this.finishArch.position.set(0, 0, -3000);
+    this.scene.add(this.finishArch);
 
     // Wooden Boardwalk Jump Ramps (placed in outer lanes so idle cruising straight at 1.6 doesn't auto-hit)
     const rampZPositions = [-75, -165, -255];
@@ -791,6 +999,61 @@ export class PelicanScene {
       pavilion.group.position.set(ROAD_HALF_WIDTH + 4.2, 0, vp.z);
       this.viewpointPavilions.push(pavilion);
       this.scene.add(pavilion.group);
+
+      // Thermo-plastic Rumble Strips placed 35m before viewpoint pavilion
+      const rumble = createRumbleStripMesh();
+      rumble.position.set(0, 0, vp.z + 35);
+      this.rumbleStrips.push(rumble);
+      this.scene.add(rumble);
+    }
+
+    // Coastal Rainbow Wonder (grand arch across the sea and coastal road)
+    this.rainbowRig = createRainbowRig();
+    this.rainbowRig.group.position.set(0, 0, -320);
+    this.scene.add(this.rainbowRig.group);
+
+    // Beachfront Campsites with warm flickering bonfires (+X = 8.8 on the beach)
+    const campsiteZPositions = [-680, -1580, -2480];
+    for (const z of campsiteZPositions) {
+      const camp = createBeachCampsiteRig();
+      camp.group.position.set(ROAD_HALF_WIDTH + 3.2, 0, z);
+      this.beachCampsites.push(camp);
+      this.scene.add(camp.group);
+    }
+
+    // Coastal Coconut Kiosks & Fresh Coconut Drink Pickups (+X on right beach and shoulder)
+    const coconutZPositions = [-1350, -2350];
+    for (const z of coconutZPositions) {
+      const kiosk = createCoconutKioskRig();
+      kiosk.baseZ = z;
+      kiosk.group.position.set(ROAD_HALF_WIDTH + 3.8, 0, z);
+      this.coconutKiosks.push(kiosk);
+      this.scene.add(kiosk.group);
+
+      const pickupGroup = createCoconutPickupMesh();
+      pickupGroup.position.set(ROAD_HALF_WIDTH - 0.35, 0.85, z);
+      this.coconutPickups.push({ group: pickupGroup, baseZ: z, collected: false });
+      this.scene.add(pickupGroup);
+    }
+
+    // Coastal Windsocks on the seaward railing (-X = -ROAD_HALF_WIDTH - 0.45)
+    const windsockZPositions = [-85, -205, -325];
+    for (const z of windsockZPositions) {
+      const sock = createWindsockRig();
+      sock.baseZ = z;
+      sock.group.position.set(-ROAD_HALF_WIDTH - 0.45, 0, z);
+      this.windsocks.push(sock);
+      this.scene.add(sock.group);
+    }
+
+    // Coastal Seawall Perched Seagulls (resting along seawall posts at -ROAD_HALF_WIDTH - 0.45)
+    const perchedZPositions = [-60, -180, -310];
+    for (const z of perchedZPositions) {
+      const gull = createPerchedSeagullMesh();
+      gull.baseZ = z;
+      gull.group.position.set(-ROAD_HALF_WIDTH - 0.45, 1.35, z);
+      this.perchedGulls.push(gull);
+      this.scene.add(gull.group);
     }
 
     // Beach Crabs on the sandy shore (+X)
@@ -834,23 +1097,27 @@ export class PelicanScene {
   }
 
   private spawnSkidMark(x: number, z: number, intensity: number): void {
-    if (this.skidMarks.length >= 45) {
+    if (this.skidMarks.length >= 60) {
       const old = this.skidMarks.shift();
       if (old) this.scene.remove(old);
+      const old2 = this.skidMarks.shift();
+      if (old2) this.scene.remove(old2);
     }
-    const skidGeo = new THREE.PlaneGeometry(0.24, 0.95);
+    const skidGeo = new THREE.PlaneGeometry(0.12, 0.95);
     const skidMat = new THREE.MeshBasicMaterial({
       color: 0x0f172a,
       transparent: true,
       opacity: Math.min(0.55, 0.25 + intensity * 0.3),
       depthWrite: false,
     });
-    const mark = new THREE.Mesh(skidGeo, skidMat);
-    mark.rotation.x = -Math.PI / 2;
-    mark.rotation.z = this.steerAngle * 0.15;
-    mark.position.set(x, 0.014, z);
-    this.scene.add(mark);
-    this.skidMarks.push(mark);
+    for (const offset of [-0.08, 0.08]) {
+      const mark = new THREE.Mesh(skidGeo, skidMat);
+      mark.rotation.x = -Math.PI / 2;
+      mark.rotation.z = this.steerAngle * 0.18;
+      mark.position.set(x + offset, 0.014, z);
+      this.scene.add(mark);
+      this.skidMarks.push(mark);
+    }
   }
 
   private saveLifetimeStats(): void {
@@ -871,7 +1138,10 @@ export class PelicanScene {
   }
 
   private spawnCompanions(): void {
-    this.companions.forEach((c) => this.scene.remove(c.rig.group));
+    this.companions.forEach((c) => {
+      if (c.speechTexture) c.speechTexture.dispose();
+      this.scene.remove(c.rig.group);
+    });
     this.companions = [];
 
     const lanePresets = [-3.9, -1.2, 3.8];
@@ -881,6 +1151,25 @@ export class PelicanScene {
       const rig = createPelicanRiderMesh(ghostIdentity, true);
       const z = this.playerZ + offsets[i];
       rig.group.position.set(lanePresets[i], 0, z);
+
+      // Create speech bubble sprite for companion
+      const bubbleCanvas = document.createElement('canvas');
+      bubbleCanvas.width = 384;
+      bubbleCanvas.height = 160;
+      const bubbleCtx = bubbleCanvas.getContext('2d');
+      const bubbleTexture = new THREE.CanvasTexture(bubbleCanvas);
+      bubbleTexture.minFilter = THREE.LinearFilter;
+      const bubbleMat = new THREE.SpriteMaterial({
+        map: bubbleTexture,
+        transparent: true,
+        depthTest: false,
+      });
+      const speechSprite = new THREE.Sprite(bubbleMat);
+      speechSprite.scale.set(3.8, 1.6, 1);
+      speechSprite.position.set(0, 3.3, 0);
+      speechSprite.visible = false;
+      rig.group.add(speechSprite);
+
       this.scene.add(rig.group);
       this.companions.push({
         rig,
@@ -888,6 +1177,108 @@ export class PelicanScene {
         z,
         speedOffset: (i - 1) * 0.45,
         pedalPhase: Math.random() * Math.PI * 2,
+        speechSprite,
+        speechTimer: 0,
+        speechCanvas: bubbleCanvas,
+        speechCtx: bubbleCtx,
+        speechTexture: bubbleTexture,
+      });
+    }
+  }
+
+  private showCompanionSpeech(comp: CompanionEntity, text: string, duration = 3.5): void {
+    if (!comp.speechCanvas || !comp.speechCtx || !comp.speechTexture || !comp.speechSprite) return;
+    drawSpeechBubbleOnCanvas(comp.speechCanvas, comp.speechCtx, comp.speechTexture, text);
+    comp.speechSprite.visible = true;
+    comp.speechTimer = duration;
+  }
+
+  private spawnFireworkBurst(
+    x: number,
+    y: number,
+    z: number,
+    palette = [0xf43f5e, 0xfbbf24, 0x38bdf8, 0xa855f7, 0x34d399, 0xfb923c],
+  ): void {
+    const geom = new THREE.SphereGeometry(0.12, 6, 6);
+    const count = 28;
+    for (let i = 0; i < count; i++) {
+      const color = palette[Math.floor(Math.random() * palette.length)];
+      const mat = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.95,
+      });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.set(x, y, z);
+      this.scene.add(mesh);
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(Math.random() * 2 - 1);
+      const speed = 4.5 + Math.random() * 6.5;
+      const vel = new THREE.Vector3(
+        Math.sin(phi) * Math.cos(theta) * speed,
+        Math.cos(phi) * speed * 0.7 + 2.5,
+        Math.sin(phi) * Math.sin(theta) * speed,
+      );
+      this.particles.push({
+        mesh,
+        vel,
+        life: 0.85 + Math.random() * 0.45,
+      });
+    }
+  }
+
+  private spawnConfettiBurst(x: number, y: number, z: number): void {
+    const palette = [0xef4444, 0xfacc15, 0x38bdf8, 0xec4899, 0x10b981, 0x8b5cf6, 0xffffff];
+    const geom = new THREE.PlaneGeometry(0.18, 0.12);
+    for (let i = 0; i < 48; i++) {
+      const color = palette[Math.floor(Math.random() * palette.length)];
+      const mat = new THREE.MeshBasicMaterial({
+        color,
+        side: THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.set(
+        x + (Math.random() - 0.5) * 8.5,
+        y + (Math.random() - 0.5) * 1.5,
+        z + (Math.random() - 0.5) * 4.0,
+      );
+      mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      this.scene.add(mesh);
+      this.particles.push({
+        mesh,
+        vel: new THREE.Vector3(
+          (Math.random() - 0.5) * 3.5,
+          1.5 + Math.random() * 3.0,
+          (Math.random() - 0.5) * 3.5,
+        ),
+        life: 1.8 + Math.random() * 0.8,
+      });
+    }
+  }
+
+  private spawnWhaleSpout(x: number, y: number, z: number): void {
+    const mistMat = new THREE.MeshBasicMaterial({
+      color: 0xe0f2fe, // Translucent ocean mist
+      transparent: true,
+      opacity: 0.85,
+    });
+    const geom = new THREE.SphereGeometry(0.18, 6, 6);
+    for (let i = 0; i < 36; i++) {
+      const mesh = new THREE.Mesh(geom, mistMat);
+      mesh.position.set(
+        x + (Math.random() - 0.5) * 0.8,
+        y + Math.random() * 0.8,
+        z + (Math.random() - 0.5) * 0.8,
+      );
+      this.scene.add(mesh);
+      this.particles.push({
+        mesh,
+        vel: new THREE.Vector3(
+          (Math.random() - 0.5) * 1.8 - 0.8, // Drifting gently towards shore
+          8.5 + Math.random() * 6.5,         // High-pressure tall water fountain
+          (Math.random() - 0.5) * 2.2,
+        ),
+        life: 1.1 + Math.random() * 0.5,
       });
     }
   }
@@ -947,7 +1338,7 @@ export class PelicanScene {
       return;
     }
 
-    coastalAudio.playBell();
+    coastalAudio.playCustomBell(this.identity.bellTone);
     coastalAudio.playPelicanHonk();
     this.bellRingTimer = 0.65;
     this.bellRingMesh.visible = true;
@@ -956,6 +1347,40 @@ export class PelicanScene {
     this.bellRingCount += 1;
     if (this.bellRingCount >= 10) {
       this.checkAchievement('bell_ringer');
+    }
+
+    // Viewpoint pavilion architectural bell slapback echo if nearby
+    for (const pavilion of this.viewpointPavilions) {
+      if (Math.abs(pavilion.group.position.z - this.playerZ) < 22) {
+        coastalAudio.playPavilionBellEcho(this.identity.bellTone);
+        break;
+      }
+    }
+
+    // Companion peloton answers the bell
+    let nearestComp: CompanionEntity | null = null;
+    let minCompDist = 999;
+    for (const comp of this.companions) {
+      const dz = Math.abs(comp.z - this.playerZ);
+      if (dz < minCompDist) {
+        minCompDist = dz;
+        nearestComp = comp;
+      }
+    }
+    if (nearestComp && minCompDist < 45) {
+      const bellReplies = [
+        '叮铃铃~ 一起冲！🚴‍♂️',
+        '收到！保持队形！💨',
+        '好动听的清脆车铃！🔔',
+        '海风正爽，跟紧大部队！🌊',
+        '同心破风，加速前进！⚡',
+      ];
+      const reply = bellReplies[Math.floor(Math.random() * bellReplies.length)];
+      this.showCompanionSpeech(nearestComp, reply, 3.2);
+      this.pelotonInteractionCount += 1;
+      if (this.pelotonInteractionCount >= 3) {
+        this.checkAchievement('peloton_spirit');
+      }
     }
 
     // Scuttle crabs when bell sounds nearby
@@ -988,6 +1413,18 @@ export class PelicanScene {
         turtle.isStartled = true;
         turtle.startleTimer = 3.2;
         this.checkAchievement('coastal_turtle');
+      }
+    }
+
+    // Beckon deep ocean whale to breach and spout when bell sounds!
+    for (const whale of this.whales) {
+      const dz = Math.abs(whale.group.position.z - this.playerZ);
+      if (dz < 130 && !whale.isJumping) {
+        whale.isJumping = true;
+        whale.jumpTimer = 0;
+        whale.hasSpouted = false;
+        whale.baseZ = this.playerZ - 18 - Math.random() * 25;
+        break;
       }
     }
   }
@@ -1139,6 +1576,8 @@ export class PelicanScene {
     this.headlightTimer = 0;
     this.isGameOver = false;
     this.tsunamisSurvived = 0;
+    this.pelotonInteractionCount = 0;
+    this.lastDraftingSpeechTime = -999;
     this.pickups = { fish: 0, shrimp: 0, starfish: 0, seaweed: 0, lantern: 0 };
     this.bannerText = '全新旅程开启 · 海风轻拂';
     this.bannerTimer = 2.6;
@@ -1193,6 +1632,69 @@ export class PelicanScene {
     this.viewpointPavilions.forEach((pavilion, idx) => {
       pavilion.group.position.set(ROAD_HALF_WIDTH + 4.2, 0, viewpointDefs[idx]);
     });
+    this.passedRumbleStrips.clear();
+    this.rumbleStrips.forEach((rumble, idx) => {
+      rumble.position.set(0, 0, viewpointDefs[idx] + 35);
+    });
+
+    const gantryPositions = [-1000, -2000];
+    this.overheadGantries.forEach((gantry, idx) => {
+      gantry.position.set(0, 0, gantryPositions[idx] || -1000);
+    });
+
+    this.finishArchCrossed = false;
+    if (this.finishArch) {
+      this.finishArch.position.set(0, 0, -3000);
+    }
+
+    this.rainbowPassed = false;
+    this.rainbowRig.group.position.set(0, 0, this.playerZ - 320);
+    this.rainbowRig.opacity = 0;
+    this.rainbowRig.targetOpacity = 0;
+    this.passedCampsites.clear();
+    const campsiteZPositions = [-680, -1580, -2480];
+    this.beachCampsites.forEach((camp, idx) => {
+      camp.group.position.set(ROAD_HALF_WIDTH + 3.2, 0, campsiteZPositions[idx] || -680);
+    });
+
+    const coconutZPositions = [-1350, -2350];
+    this.coconutKiosks.forEach((kiosk, idx) => {
+      kiosk.baseZ = coconutZPositions[idx] || -1350;
+      kiosk.group.position.set(ROAD_HALF_WIDTH + 3.8, 0, kiosk.baseZ);
+    });
+    this.coconutPickups.forEach((p, idx) => {
+      p.baseZ = coconutZPositions[idx] || -1350;
+      p.collected = false;
+      p.group.visible = true;
+      p.group.position.set(ROAD_HALF_WIDTH - 0.35, 0.85, p.baseZ);
+    });
+
+    const windsockZPositions = [-85, -205, -325];
+    this.windsocks.forEach((sock, idx) => {
+      sock.group.position.set(-ROAD_HALF_WIDTH - 0.45, 0, windsockZPositions[idx] || -85);
+    });
+    if (this.eveningStar) {
+      (this.eveningStar.material as THREE.MeshBasicMaterial).opacity = 0;
+    }
+    const perchedZPositions = [-60, -180, -310];
+    this.perchedGulls.forEach((gull, idx) => {
+      gull.baseZ = this.playerZ + (perchedZPositions[idx] || -60);
+      gull.group.position.set(-ROAD_HALF_WIDTH - 0.45, 1.35, gull.baseZ);
+      gull.group.rotation.set(0, 0, 0);
+      gull.isFleeing = false;
+      gull.fleeTimer = 0;
+      gull.flapPhase = 0;
+      gull.leftWing.rotation.z = -0.45;
+      gull.rightWing.rotation.z = 0.45;
+    });
+
+    this.whales.forEach((whale, idx) => {
+      whale.isJumping = false;
+      whale.jumpTimer = Math.random() * 10;
+      whale.hasSpouted = false;
+      whale.baseZ = this.playerZ - 110 - idx * 140;
+      whale.group.position.set(whale.baseX, -6.0, whale.baseZ);
+    });
 
     this.spawnCompanions();
     this.resetDisasterCycle(true);
@@ -1219,6 +1721,15 @@ export class PelicanScene {
     coastalAudio.startSiren();
     coastalAudio.setBgmMode('warning');
     this.spawnWaveCollectiblesBatch(5);
+
+    const warnAlerts = [
+      '巨浪来啦！快猛踩！🌊',
+      '抓紧车把！全速冲刺！⚡',
+      '别回头！冲上高地！🚴💨',
+    ];
+    this.companions.forEach((comp, idx) => {
+      this.showCompanionSpeech(comp, warnAlerts[idx % warnAlerts.length], 4.2);
+    });
   }
 
   private enterActiveTsunami(): void {
@@ -1248,6 +1759,22 @@ export class PelicanScene {
     this.checkAchievement('coastal_melody');
     coastalAudio.stopWaveRoar();
     coastalAudio.startCalmSurf();
+
+    const cheerAlerts = [
+      '呼~ 成功甩开巨浪！太棒啦！🎉',
+      '安然无恙！海边夕阳真美~ ☀️',
+      '车队无敌！继续飞驰！✨',
+    ];
+    this.companions.forEach((comp, idx) => {
+      this.showCompanionSpeech(comp, cheerAlerts[idx % cheerAlerts.length], 3.8);
+    });
+    // Celebratory fireworks over the sea
+    this.spawnFireworkBurst(this.playerX - 6, 13, this.playerZ - 18);
+    coastalAudio.playFirework();
+    setTimeout(() => {
+      this.spawnFireworkBurst(this.playerX + 5, 14, this.playerZ - 22);
+      coastalAudio.playFirework();
+    }, 450);
   }
 
   private spawnWaveCollectiblesBatch(count: number): void {
@@ -1416,16 +1943,56 @@ export class PelicanScene {
         life: 0.5,
       });
     }
+
+    // Expanding sea foam splash ripple ring
+    const ringGeo = new THREE.RingGeometry(0.5, 0.75, 16);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: isNight ? 0x22d3ee : 0xe0f2fe,
+      transparent: true,
+      opacity: isNight ? 0.85 : 0.65,
+      side: THREE.DoubleSide,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(x, 0.05, z);
+    this.scene.add(ring);
+    this.particles.push({
+      mesh: ring,
+      vel: new THREE.Vector3(0, 0, 0),
+      life: 0.8,
+    });
   }
 
   private handlePickup(item: CollectibleEntity): void {
     this.pickups[item.type] += 1;
     this.lifetimeStats.totalPickups += 1;
+    const isSnappingBeak = this.beakSnapTimer > 0.05 || this.bellRingTimer > 0;
     this.beakSnapTimer = 0.35;
     coastalAudio.playPickup(item.type);
     try {
       navigator.vibrate?.(25);
     } catch {}
+
+    if (isSnappingBeak) {
+      this.xp += 1;
+      this.bannerText = '✨ 完美飞啄！PERFECT CATCH +1 风格星！';
+      this.bannerTimer = 1.6;
+      const starMat = new THREE.MeshBasicMaterial({ color: 0xfde047, transparent: true, opacity: 0.9 });
+      for (let s = 0; s < 8; s++) {
+        const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), starMat);
+        star.position.set(
+          item.mesh.position.x + (Math.random() - 0.5) * 0.6,
+          item.mesh.position.y + 0.3 + (Math.random() - 0.5) * 0.6,
+          item.mesh.position.z + (Math.random() - 0.5) * 0.6,
+        );
+        this.scene.add(star);
+        this.particles.push({
+          mesh: star,
+          vel: new THREE.Vector3((Math.random() - 0.5) * 2.5, 2.0 + Math.random() * 2.0, (Math.random() - 0.5) * 2.5),
+          life: 0.6,
+        });
+      }
+    }
 
     // Combo Chain System
     if (this.comboTimer > 0) {
@@ -1447,6 +2014,17 @@ export class PelicanScene {
         }
         this.checkAchievement('combo_frenzy');
       }
+    }
+
+    // Grand Tour Master Check (All 5 ocean treasures gathered)
+    if (
+      this.pickups.fish >= 3 &&
+      this.pickups.shrimp >= 3 &&
+      this.pickups.starfish >= 2 &&
+      this.pickups.seaweed >= 2 &&
+      this.pickups.lantern >= 1
+    ) {
+      this.checkAchievement('grand_tour_master');
     }
 
     const colorMap: Record<CollectibleType, number> = {
@@ -1635,24 +2213,41 @@ export class PelicanScene {
         this.lastDraftingSoundTime = elapsedSec;
         coastalAudio.playDraftingWhoosh();
       }
-      // Aerodynamic cyan slipstream ribbon particle
-      if (Math.random() < 0.45 && draftingCompanion) {
+      if (elapsedSec - this.lastDraftingSpeechTime > 8.0 && draftingCompanion) {
+        this.lastDraftingSpeechTime = elapsedSec;
+        const draftReplies = [
+          '破风交给我！跟紧啦~ 🚴💨',
+          '借我的破风气流冲刺吧！⚡',
+          '完美尾流！一起穿透海风！🌀',
+          '贴紧我！能省下不少体力！🌬️',
+        ];
+        const reply = draftReplies[Math.floor(Math.random() * draftReplies.length)];
+        this.showCompanionSpeech(draftingCompanion, reply, 3.0);
+        this.pelotonInteractionCount += 1;
+        if (this.pelotonInteractionCount >= 3) {
+          this.checkAchievement('peloton_spirit');
+        }
+      }
+      // Aerodynamic dual vortex slipstream ribbons streaming from lead rider
+      if (Math.random() < 0.65 && draftingCompanion) {
         const ribbonMat = new THREE.MeshBasicMaterial({
           color: 0x38bdf8,
           transparent: true,
-          opacity: 0.7,
+          opacity: 0.75,
         });
-        const ribbon = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.8), ribbonMat);
-        ribbon.position.set(
-          draftingCompanion.laneX + (Math.random() - 0.5) * 0.4,
-          0.45 + (Math.random() - 0.5) * 0.25,
-          (this.playerZ + draftingCompanion.z) * 0.5 + (Math.random() - 0.5) * 0.8,
-        );
-        this.scene.add(ribbon);
-        this.particles.push({
-          mesh: ribbon,
-          vel: new THREE.Vector3(0, 0, 12),
-          life: 0.25,
+        [-0.32, 0.32].forEach((sideOffset) => {
+          const ribbon = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 1.1), ribbonMat);
+          ribbon.position.set(
+            draftingCompanion.laneX + sideOffset,
+            0.55 + Math.sin(elapsedSec * 16 + sideOffset) * 0.08,
+            draftingCompanion.z + 0.8 + Math.random() * 0.8,
+          );
+          this.scene.add(ribbon);
+          this.particles.push({
+            mesh: ribbon,
+            vel: new THREE.Vector3((this.playerX - draftingCompanion.laneX) * 0.8, 0, this.speed + 14),
+            life: 0.3,
+          });
         });
       }
     } else {
@@ -1685,6 +2280,23 @@ export class PelicanScene {
     }
 
     // Determine target forward/reverse velocity
+    const isStormThreat = this.disasterPhase === 'warning' || this.disasterPhase === 'active';
+    this.windAngleRad = Math.sin(this.playerZ * 0.006) * 0.55;
+    const tailwindFactor = Math.cos(this.windAngleRad);
+    this.windSpeedKmh = Math.round(12 + Math.abs(Math.sin(elapsedSec * 0.25)) * 14 + (isStormThreat ? 16 : 0));
+    this.windDirectionLabel = isStormThreat
+      ? '台风狂澜'
+      : tailwindFactor > 0.9
+      ? '正顺风'
+      : tailwindFactor > 0.65
+      ? '侧顺风'
+      : '侧逆风';
+
+    const windBonus = !isStormThreat && tailwindFactor > 0.65 ? 1.4 : 0;
+    if (this.speed * 3.2 >= 52 && tailwindFactor > 0.65 && !isStormThreat) {
+      this.checkAchievement('tailwind_rider');
+    }
+
     const boostBonus =
       (this.boostTimer > 0 ? 7.5 : this.shieldTimer > 0 ? 2.5 : this.headlightTimer > 0 ? 3.5 : 0) +
       comboBonus;
@@ -1695,7 +2307,7 @@ export class PelicanScene {
     const wantsDrift =
       this.input.brake && (this.input.left || this.input.right) && (this.speed > 5.5 || this.isDrifting);
 
-    let targetSpeed = (tier.cruiseSpeed + boostBonus) * draftingBonus; // Auto-cruise with bonuses
+    let targetSpeed = (tier.cruiseSpeed + boostBonus + windBonus) * draftingBonus; // Auto-cruise with bonuses
     let accelRate = 7.5;
 
     if (wantsDrift && !this.isJumpingAir) {
@@ -1895,6 +2507,33 @@ export class PelicanScene {
     if (distanceMeters >= 100) this.checkAchievement('first_mile');
     if (this.speed * 3.2 >= 65) this.checkAchievement('speed_demon');
     if (this.tsunamisSurvived >= 3) this.checkAchievement('tsunami_master');
+    if (distanceMeters >= 2000 && (this.timeOfDay === 'sunset' || this.timeOfDay === 'night')) {
+      this.checkAchievement('twilight_dreamer');
+    }
+    if (distanceMeters >= 3000) {
+      this.checkAchievement('century_rider');
+    }
+
+    // 3000M Grand Tour Finish Line Celebration
+    if (this.playerZ <= -3000 && !this.finishArchCrossed) {
+      this.finishArchCrossed = true;
+      coastalAudio.playFirework();
+      this.spawnConfettiBurst(0, 5.0, -3000);
+      this.spawnFireworkBurst(-5, 15, -3015);
+      this.spawnFireworkBurst(5, 15, -3015);
+      this.bannerText = '🏆 冲过 3000M 巡礼终点线！座驾登顶【海角传说】！';
+      this.bannerTimer = 4.2;
+      try {
+        navigator.vibrate?.([60, 40, 80, 40, 100]);
+      } catch {}
+      if (this.companions.length > 0) {
+        this.showCompanionSpeech(
+          this.companions[0],
+          '突破3000米大关！我们完成了海角大巡礼！🎉',
+          4.0,
+        );
+      }
+    }
 
     // Time-of-Day Cycling (Noon -> Sunset -> Night -> Dawn)
     const cycleMeters = distanceMeters % 3200;
@@ -2311,6 +2950,32 @@ export class PelicanScene {
     this.starfield.position.z = this.playerZ;
     this.starfield.rotation.y += dt * 0.005;
 
+    // Evening Star shining softly above western sea horizon at dusk/night
+    const targetEveningStarOpacity =
+      !isThreat && (this.timeOfDay === 'sunset' || this.timeOfDay === 'night') ? 0.92 : 0;
+    (this.eveningStar.material as THREE.MeshBasicMaterial).opacity +=
+      (targetEveningStarOpacity - (this.eveningStar.material as THREE.MeshBasicMaterial).opacity) *
+      Math.min(1, 2 * dt);
+    this.eveningStar.position.z = this.playerZ - 180;
+    this.eveningStar.scale.setScalar(0.9 + Math.sin(elapsedSec * 2.5) * 0.18);
+
+    // Shimmering Crescent Moon & Lunar Reflection Ribbon
+    const targetMoonOpacity = !isThreat && this.timeOfDay === 'night' ? 0.95 : 0;
+    this.crescentMoon.children.forEach((child, idx) => {
+      const mat = (child as THREE.Mesh).material as THREE.MeshBasicMaterial;
+      if (mat) {
+        const target = idx === 1 ? targetMoonOpacity * 0.35 : targetMoonOpacity;
+        mat.opacity += (target - mat.opacity) * Math.min(1, 2 * dt);
+      }
+    });
+    this.crescentMoon.position.z = this.playerZ - 220;
+
+    const targetLunarRefl =
+      !isThreat && this.timeOfDay === 'night' ? 0.24 + Math.sin(elapsedSec * 1.8) * 0.06 : 0;
+    (this.lunarReflectionMesh.material as THREE.MeshBasicMaterial).opacity +=
+      (targetLunarRefl - (this.lunarReflectionMesh.material as THREE.MeshBasicMaterial).opacity) * Math.min(1, 2 * dt);
+    this.lunarReflectionMesh.position.z = this.playerZ - 180;
+
     // Bicycle Headlamp: removed from default passive state; only projects as an active power-up effect!
     const isHeadlightActive = this.headlightTimer > 0;
     if (this.playerRig.headlightBeam) {
@@ -2330,12 +2995,26 @@ export class PelicanScene {
     rainMat.opacity += (targetRainOpacity - rainMat.opacity) * Math.min(1, 3.5 * dt);
     this.isRaining = rainMat.opacity > 0.05;
 
-    // Dynamic Road Surface Wetness Reflection during storm rain
+    // Dynamic Road Surface Wetness Reflection during storm rain or receding tsunami
+    const isWetRoad = this.isRaining || this.disasterPhase === 'receding';
     if (this.roadMat) {
-      const targetRoughness = this.isRaining ? 0.22 : 0.88;
-      const targetMetalness = this.isRaining ? 0.38 : 0.05;
+      const targetRoughness = isWetRoad ? 0.24 : 0.88;
+      const targetMetalness = isWetRoad ? 0.36 : 0.05;
       this.roadMat.roughness += (targetRoughness - this.roadMat.roughness) * Math.min(1, 2.5 * dt);
       this.roadMat.metalness += (targetMetalness - this.roadMat.metalness) * Math.min(1, 2.5 * dt);
+    }
+    coastalAudio.updateOceanProximity(this.playerX);
+
+    if (isWetRoad && Math.abs(this.speed) > 10 && Math.random() < 0.25) {
+      const sprayMat = new THREE.MeshBasicMaterial({ color: 0xc7d2fe, transparent: true, opacity: 0.65 });
+      const spray = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.06), sprayMat);
+      spray.position.set(this.playerX + (Math.random() - 0.5) * 0.2, 0.08, this.playerZ + 0.7);
+      this.scene.add(spray);
+      this.particles.push({
+        mesh: spray,
+        vel: new THREE.Vector3((Math.random() - 0.5) * 1.8, 1.2 + Math.random() * 0.8, 4.0),
+        life: 0.22,
+      });
     }
 
     if (rainMat.opacity > 0.01) {
@@ -2387,6 +3066,30 @@ export class PelicanScene {
       cMat.emissiveIntensity = isNight ? 0.85 : 0;
     });
 
+    // Procedural Ocean Sun Shimmer / Water Sparkles
+    if (this.timeOfDay === 'noon' || this.timeOfDay === 'sunset') {
+      if (Math.random() < 0.28 && this.particles.length < 90) {
+        const glintColor = this.timeOfDay === 'sunset' ? 0xfde047 : 0xffffff;
+        const glintMat = new THREE.MeshBasicMaterial({
+          color: glintColor,
+          transparent: true,
+          opacity: 0.78,
+        });
+        const glint = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), glintMat);
+        glint.position.set(
+          -14 - Math.random() * 35,
+          -0.12 + Math.sin(elapsedSec * 1.5) * 0.08,
+          this.playerZ - 12 - Math.random() * 68,
+        );
+        this.scene.add(glint);
+        this.particles.push({
+          mesh: glint,
+          vel: new THREE.Vector3((Math.random() - 0.5) * 0.2, 0, (Math.random() - 0.5) * 0.2),
+          life: 0.55 + Math.random() * 0.45,
+        });
+      }
+    }
+
     // Jumping Dolphins in coastal sea
     for (let i = 0; i < this.dolphins.length; i++) {
       const dol = this.dolphins[i];
@@ -2424,6 +3127,70 @@ export class PelicanScene {
       }
     }
 
+    // Majestic Deep-Ocean Whales
+    for (const whale of this.whales) {
+      whale.jumpTimer += dt;
+      if (!whale.isJumping && whale.jumpTimer >= whale.jumpCycleTime) {
+        whale.isJumping = true;
+        whale.jumpTimer = 0;
+        whale.hasSpouted = false;
+        whale.baseZ = this.playerZ - 45 - Math.random() * 65;
+      }
+
+      if (whale.isJumping) {
+        const duration = 5.2;
+        const t = whale.jumpTimer / duration;
+        if (t >= 1) {
+          whale.isJumping = false;
+          whale.jumpTimer = 0;
+          whale.hasSpouted = false;
+          whale.group.position.y = -6.0;
+          this.spawnSplashParticles(whale.baseX, 0, whale.baseZ - 24);
+        } else {
+          // Parabolic breach arc: submerged -> rise up to +5.8m -> dive down
+          const peakY = 5.8;
+          const y = -6.0 + (peakY + 6.0) * Math.sin(t * Math.PI);
+          whale.group.position.y = y;
+          whale.group.position.x = whale.baseX;
+          whale.group.position.z = whale.baseZ - t * 24;
+
+          // Pitch rotation: head up while rising, arched at crest, diving down at end
+          whale.group.rotation.x = (t - 0.48) * 1.5;
+          // Roll slightly for natural breaching spectacle
+          whale.group.rotation.z = Math.sin(t * Math.PI) * 0.35;
+
+          // Tail fluke undulating animation
+          whale.tailFluke.rotation.x = Math.sin(t * 14) * 0.45;
+          whale.flipperLeft.rotation.z = -0.4 + Math.sin(t * 8) * 0.2;
+          whale.flipperRight.rotation.z = 0.4 - Math.sin(t * 8) * 0.2;
+
+          // Water spout mist at crest (when y > 3.2m)
+          if (t > 0.32 && !whale.hasSpouted) {
+            whale.hasSpouted = true;
+            coastalAudio.playWaterSpout();
+            coastalAudio.playWhaleSong();
+            this.spawnWhaleSpout(
+              whale.group.position.x,
+              whale.group.position.y + 1.8,
+              whale.group.position.z - 3.8,
+            );
+            this.bannerText = '🐋 远海有巨鲸破浪出海，昂首向天喷泉！';
+            this.bannerTimer = 3.6;
+            this.checkAchievement('ocean_whale');
+          }
+        }
+      } else {
+        // Gentle underwater cruising & bobbing
+        whale.group.position.y = -5.5 + Math.sin(elapsedSec * 0.8) * 0.6;
+        whale.group.position.x = whale.baseX;
+        whale.tailFluke.rotation.x = Math.sin(elapsedSec * 1.8) * 0.15;
+        if (whale.group.position.z > this.playerZ + 80) {
+          whale.baseZ = this.playerZ - 140 - Math.random() * 80;
+          whale.group.position.z = whale.baseZ;
+        }
+      }
+    }
+
     // Coastal road signs recycling along Z
     for (const sign of this.roadSigns) {
       if (sign.position.z > this.playerZ + 35) {
@@ -2445,6 +3212,18 @@ export class PelicanScene {
         if (marker.targetMeters >= 1000) {
           this.checkAchievement('coastal_milestone');
         }
+        if (marker.targetMeters >= 1000 && marker.targetMeters % 1000 === 0) {
+          this.spawnFireworkBurst(marker.group.position.x - 5, 14, marker.group.position.z - 12);
+          coastalAudio.playFirework();
+          if (this.companions.length > 0) {
+            const leadComp = this.companions[0];
+            this.showCompanionSpeech(
+              leadComp,
+              `突破 ${(marker.targetMeters / 1000).toFixed(0)} 公里！太帅了！🏆`,
+              3.5,
+            );
+          }
+        }
       }
 
       // Recycle marker stone when it scrolls far behind player
@@ -2456,6 +3235,19 @@ export class PelicanScene {
             ? `G228 ${(marker.targetMeters / 1000).toFixed(1)}KM`
             : `G228 ${marker.targetMeters}M`;
       }
+    }
+
+    // G228 Coastal Highway Overhead Directional Gantries recycling
+    for (const gantry of this.overheadGantries) {
+      if (gantry.position.z > this.playerZ + 85) {
+        gantry.position.z -= 2 * 1000;
+      }
+    }
+
+    // 3000M Grand Tour Finish Arch recycling
+    if (this.finishArch && this.finishArch.position.z > this.playerZ + 85) {
+      this.finishArch.position.z -= 3000;
+      this.finishArchCrossed = false;
     }
 
     for (const pavilion of this.viewpointPavilions) {
@@ -2474,6 +3266,204 @@ export class PelicanScene {
       // Recycle viewpoint pavilion when far behind
       if (pavilion.group.position.z > this.playerZ + 75) {
         pavilion.group.position.z -= 4 * 800;
+      }
+    }
+
+    // Thermo-plastic Rumble Strips (approaching viewpoint pavilions)
+    for (let i = 0; i < this.rumbleStrips.length; i++) {
+      const rumble = this.rumbleStrips[i];
+      const distZ = Math.abs(this.playerZ - rumble.position.z);
+      const distX = Math.abs(this.playerX - rumble.position.x);
+      if (distZ < 1.8 && distX < ROAD_HALF_WIDTH && !this.passedRumbleStrips.has(i)) {
+        this.passedRumbleStrips.add(i);
+        coastalAudio.playRumbleStrip();
+        try {
+          navigator.vibrate?.([15, 20, 15, 20, 15]);
+        } catch {}
+      }
+
+      // Recycle rumble strip when far behind
+      if (rumble.position.z > this.playerZ + 75) {
+        rumble.position.z -= 4 * 800;
+        this.passedRumbleStrips.delete(i);
+      }
+    }
+
+    // Coastal Rainbow Wonder (dynamic arch across sky and sea)
+    const wantsRainbow =
+      !isThreat && (this.timeOfDay === 'sunset' || this.timeOfDay === 'noon' || this.tsunamisSurvived > 0);
+    this.rainbowRig.targetOpacity = wantsRainbow ? 0.68 : 0;
+    this.rainbowRig.opacity +=
+      (this.rainbowRig.targetOpacity - this.rainbowRig.opacity) * Math.min(1, 2.0 * dt);
+    this.rainbowRig.bands.forEach((band) => {
+      (band.material as THREE.MeshBasicMaterial).opacity = this.rainbowRig.opacity;
+    });
+
+    const distToRainbow = Math.abs(this.playerZ - this.rainbowRig.group.position.z);
+    if (distToRainbow < 14 && this.rainbowRig.opacity > 0.25 && !this.rainbowPassed) {
+      this.rainbowPassed = true;
+      this.boostTimer = Math.max(this.boostTimer, 4.0);
+      this.speed += 5.5;
+      coastalAudio.playRainbowChime();
+      this.bannerText = '🌈 穿越七彩跨海虹桥 · 迎着金芒飞驰！';
+      this.bannerTimer = 2.8;
+      try {
+        navigator.vibrate?.([40, 20, 60, 30, 80]);
+      } catch {}
+      this.checkAchievement('coastal_rainbow');
+
+      // Cascade of prismatic rainbow sparkles
+      const rainbowColors = [0xef4444, 0xf97316, 0xfacc15, 0x22c55e, 0x06b6d4, 0x3b82f6, 0x8b5cf6];
+      for (let k = 0; k < 24; k++) {
+        const pMat = new THREE.MeshBasicMaterial({
+          color: rainbowColors[k % rainbowColors.length],
+          transparent: true,
+          opacity: 0.95,
+        });
+        const pMesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.14, 0), pMat);
+        pMesh.position.set(
+          this.playerX + (Math.random() - 0.5) * 4.5,
+          2.5 + Math.random() * 4.5,
+          this.playerZ + (Math.random() - 0.5) * 5.0,
+        );
+        this.scene.add(pMesh);
+        this.particles.push({
+          mesh: pMesh,
+          vel: new THREE.Vector3(
+            (Math.random() - 0.5) * 3,
+            2.0 + Math.random() * 3.5,
+            (Math.random() - 0.5) * 3,
+          ),
+          life: 0.7,
+        });
+      }
+    }
+
+    if (this.rainbowRig.group.position.z > this.playerZ + 60) {
+      this.rainbowRig.group.position.z = this.playerZ - 420;
+      this.rainbowPassed = false;
+    }
+
+    // Beachfront Campsites & Bonfire Dynamics
+    for (let cIdx = 0; cIdx < this.beachCampsites.length; cIdx++) {
+      const camp = this.beachCampsites[cIdx];
+      // Bonfire flame flicker
+      camp.fireFlame.scale.y = 0.85 + Math.sin(elapsedSec * 16 + cIdx * 2) * 0.25;
+      camp.fireFlame.scale.x = 0.9 + Math.cos(elapsedSec * 14 + cIdx) * 0.15;
+      const lightTarget =
+        this.timeOfDay === 'night' ? 2.5 : this.timeOfDay === 'sunset' ? 1.6 : 0.6;
+      camp.fireLight.intensity = lightTarget + Math.sin(elapsedSec * 12 + cIdx) * 0.35;
+
+      const campDist = Math.abs(this.playerZ - camp.group.position.z);
+      const campKey = Math.round(camp.group.position.z);
+      if (campDist < 12 && !this.passedCampsites.has(campKey)) {
+        this.passedCampsites.add(campKey);
+        coastalAudio.playCampfireCrackle();
+        this.bannerText = '⛺ 掠过「海风星空露营地」· 晚风与篝火渐暖';
+        this.bannerTimer = 2.4;
+        this.checkAchievement('bonfire_gatherer');
+        try {
+          navigator.vibrate?.([25, 20, 35]);
+        } catch {}
+      }
+
+      // Twilight & nighttime fireflies hovering gently around campsite tents
+      if ((this.timeOfDay === 'sunset' || this.timeOfDay === 'night') && Math.random() < 0.18) {
+        const fireflyMat = new THREE.MeshBasicMaterial({
+          color: 0xfef08a,
+          transparent: true,
+          opacity: 0.85,
+        });
+        const firefly = new THREE.Mesh(new THREE.SphereGeometry(0.06, 4, 4), fireflyMat);
+        firefly.position.set(
+          camp.group.position.x + (Math.random() - 0.5) * 4.5,
+          0.8 + Math.random() * 1.6,
+          camp.group.position.z + (Math.random() - 0.5) * 4.5,
+        );
+        this.scene.add(firefly);
+        this.particles.push({
+          mesh: firefly,
+          vel: new THREE.Vector3((Math.random() - 0.5) * 0.4, 0.2 + Math.random() * 0.3, (Math.random() - 0.5) * 0.4),
+          life: 1.4 + Math.random() * 0.8,
+        });
+      }
+
+      if (camp.group.position.z > this.playerZ + 65) {
+        camp.group.position.z -= 3 * 900;
+      }
+    }
+
+    // Coastal Coconut Kiosks & Fresh Coconut Drink Pickups
+    for (let k = 0; k < this.coconutKiosks.length; k++) {
+      const kiosk = this.coconutKiosks[k];
+      const pickup = this.coconutPickups[k];
+
+      if (pickup && !pickup.collected) {
+        pickup.group.rotation.y += dt * 3.2;
+        pickup.group.position.y = 0.85 + Math.sin(elapsedSec * 3.0 + k) * 0.12;
+
+        const distZ = Math.abs(this.playerZ - pickup.group.position.z);
+        const distX = Math.abs(this.playerX - pickup.group.position.x);
+        if (distZ < 1.8 && distX < 2.0) {
+          pickup.collected = true;
+          pickup.group.visible = false;
+          coastalAudio.playCoconutSip();
+          this.boostTimer = Math.max(this.boostTimer, 4.0);
+          this.speed += 6.0;
+          this.bannerText = '🥥 畅饮冰镇椰青 · 注入满满海岛活力！极速破风！';
+          this.bannerTimer = 3.0;
+          this.checkAchievement('coconut_refresh');
+          try {
+            navigator.vibrate?.([40, 25, 60]);
+          } catch {}
+
+          // Refreshing turquoise hydration droplet mist burst
+          const dropMat = new THREE.MeshBasicMaterial({
+            color: 0x38bdf8,
+            transparent: true,
+            opacity: 0.9,
+          });
+          for (let d = 0; d < 14; d++) {
+            const drop = new THREE.Mesh(new THREE.DodecahedronGeometry(0.12, 0), dropMat);
+            drop.position.set(
+              pickup.group.position.x + (Math.random() - 0.5) * 0.8,
+              pickup.group.position.y + (Math.random() - 0.5) * 0.8,
+              pickup.group.position.z + (Math.random() - 0.5) * 0.8,
+            );
+            this.scene.add(drop);
+            this.particles.push({
+              mesh: drop,
+              vel: new THREE.Vector3(
+                (Math.random() - 0.5) * 2.8,
+                1.5 + Math.random() * 2.5,
+                (Math.random() - 0.5) * 2.8,
+              ),
+              life: 0.9 + Math.random() * 0.5,
+            });
+          }
+        }
+      }
+
+      // Recycle kiosk & pickup when far behind
+      if (kiosk.group.position.z > this.playerZ + 65) {
+        kiosk.group.position.z -= 2 * 1000;
+        if (pickup) {
+          pickup.group.position.z = kiosk.group.position.z;
+          pickup.collected = false;
+          pickup.group.visible = true;
+        }
+      }
+    }
+
+    // Coastal Windsocks Animation & Recycling
+    for (let wsIdx = 0; wsIdx < this.windsocks.length; wsIdx++) {
+      const ws = this.windsocks[wsIdx];
+      // Point in the direction the wind is blowing (swivel along Y)
+      ws.sockPivot.rotation.y = Math.PI * 0.5 + this.windAngleRad + Math.sin(elapsedSec * 3 + wsIdx) * 0.06;
+      ws.sockCloth.rotation.z = Math.sin(elapsedSec * 7 + wsIdx) * 0.07;
+
+      if (ws.group.position.z > this.playerZ + 45) {
+        ws.group.position.z -= 3 * 120;
       }
     }
 
@@ -2652,6 +3642,49 @@ export class PelicanScene {
       }
     }
 
+    // Seawall Perched Seagulls: resting on posts, take flight when approached or alarmed by bell
+    for (let i = 0; i < this.perchedGulls.length; i++) {
+      const pg = this.perchedGulls[i];
+      const distToPlayer = Math.hypot(this.playerX - pg.group.position.x, this.playerZ - pg.group.position.z);
+
+      if (!pg.isFleeing && (distToPlayer < 9.0 || this.bellRingTimer > 0.45)) {
+        pg.isFleeing = true;
+        pg.fleeTimer = 0;
+        if (elapsedSec - this.lastSeagullSoundTime > 2.5) {
+          this.lastSeagullSoundTime = elapsedSec;
+          coastalAudio.playSeagullSquawk();
+        }
+      }
+
+      if (pg.isFleeing) {
+        pg.fleeTimer += dt;
+        pg.flapPhase += dt * 14.0;
+        pg.leftWing.rotation.z = 0.12 + Math.sin(pg.flapPhase) * 0.42;
+        pg.rightWing.rotation.z = -0.12 - Math.sin(pg.flapPhase) * 0.42;
+
+        // Take off upward and curve out over the ocean (-X)
+        pg.group.position.y += dt * 4.2;
+        pg.group.position.x -= dt * 6.5;
+        pg.group.position.z -= (this.speed * 0.4 + 5.0) * dt;
+        pg.group.rotation.y = -0.45;
+        pg.group.rotation.z = 0.22;
+      } else {
+        // Idling peacefully on seawall post with subtle bob
+        pg.group.position.y = 1.35 + Math.sin(elapsedSec * 2.0 + i) * 0.015;
+      }
+
+      // Recycle ahead when far behind player
+      if (pg.group.position.z > this.playerZ + 40) {
+        pg.isFleeing = false;
+        pg.fleeTimer = 0;
+        pg.baseZ = this.playerZ - 120 - Math.random() * 80;
+        pg.group.position.set(-ROAD_HALF_WIDTH - 0.45, 1.35, pg.baseZ);
+        pg.group.rotation.set(0, 0, 0);
+        pg.leftWing.rotation.z = -0.45;
+        pg.rightWing.rotation.z = 0.45;
+      }
+    }
+
     // Quiet companion ghost pelicans
     this.companions.forEach((comp, idx) => {
       const compSpeed =
@@ -2669,6 +3702,14 @@ export class PelicanScene {
       comp.rig.frontWheel.rotation.x -= compSpeed * dt * 2.1;
       comp.rig.crankGroup.rotation.x = comp.pedalPhase;
       comp.rig.scarfTail.rotation.y = Math.sin(elapsedSec * 7 + idx) * 0.2;
+
+      // Update speech bubble countdown
+      if (comp.speechTimer && comp.speechTimer > 0) {
+        comp.speechTimer -= dt;
+        if (comp.speechTimer <= 0 && comp.speechSprite) {
+          comp.speechSprite.visible = false;
+        }
+      }
     });
 
     // Collectible spawning & pickup detection
@@ -2780,6 +3821,18 @@ export class PelicanScene {
       this.camera.fov += (desiredFov - this.camera.fov) * Math.min(1, 4 * dt);
       this.camera.updateProjectionMatrix();
     }
+
+    // Dynamic Camera Banking into high-speed turns & drifts
+    const targetCamRoll = this.isDrifting
+      ? (this.input.left ? 0.045 : -0.045)
+      : -this.steerAngle * 0.024;
+    this.camera.rotation.z += (targetCamRoll - this.camera.rotation.z) * Math.min(1, 8.0 * dt);
+
+    // Subtle speed micro-vibration during supersonic boost (>52 km/h) or fever mode
+    if (this.speed > 14.5 || this.isFeverMode) {
+      this.camera.position.x += (Math.random() - 0.5) * 0.015;
+      this.camera.position.y += (Math.random() - 0.5) * 0.012;
+    }
   }
 
   private animatePelicanRig(
@@ -2789,6 +3842,11 @@ export class PelicanScene {
     elapsedSec: number,
     dt: number,
   ): void {
+    // Update live handlebar digital GPS cycling computer
+    const speedKmh = Math.round(speed * 3.6);
+    const cadenceRpm = Math.round(Math.min(135, 60 + (speed / 12) * 45));
+    rig.updateOdometer?.(speedKmh, cadenceRpm, this.boostTimer > 0);
+
     const wheelSpin = (speed / 0.44) * dt;
     rig.rearWheel.rotation.x -= wheelSpin;
     rig.frontWheel.rotation.x -= wheelSpin;
@@ -2842,9 +3900,17 @@ export class PelicanScene {
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.life -= dt;
-      p.vel.y -= 9.5 * dt;
-      p.mesh.position.addScaledVector(p.vel, dt);
-      p.mesh.scale.setScalar(Math.max(0.05, p.life / 0.55));
+      if (p.vel.lengthSq() > 0.0001) {
+        p.vel.y -= 9.5 * dt;
+        p.mesh.position.addScaledVector(p.vel, dt);
+        p.mesh.scale.setScalar(Math.max(0.05, p.life / 0.55));
+      } else {
+        // Flat surface ripple ring: expand radius & fade
+        const progress = 1 - Math.max(0, p.life / 0.8);
+        p.mesh.scale.setScalar(1 + progress * 4.2);
+        const mat = p.mesh.material as THREE.MeshBasicMaterial;
+        if (mat) mat.opacity = (p.life / 0.8) * 0.75;
+      }
       if (p.life <= 0) {
         this.scene.remove(p.mesh);
         this.particles.splice(i, 1);
@@ -2923,6 +3989,8 @@ export class PelicanScene {
       bgmVolume: coastalAudio.getBgmVolume(),
       gear,
       tachometerPct,
+      windSpeedKmh: this.windSpeedKmh,
+      windDirectionLabel: this.windDirectionLabel,
     });
   }
 
@@ -2959,6 +4027,9 @@ export class PelicanScene {
     coastalAudio.stopSiren();
     coastalAudio.stopWaveRoar();
     coastalAudio.stopCalmSurf();
+    this.companions.forEach((c) => {
+      if (c.speechTexture) c.speechTexture.dispose();
+    });
     this.renderer.dispose();
     if (this.renderer.domElement.parentElement === this.container) {
       this.container.removeChild(this.renderer.domElement);

@@ -10,6 +10,7 @@ import {
   Volume2,
   VolumeX,
   Waves,
+  Wind,
   Zap,
 } from 'lucide-react';
 import { GameHudState } from '../game/types';
@@ -67,6 +68,17 @@ export function GameHud({
             boxShadow: 'inset 0 0 55px rgba(245, 158, 11, 0.45)',
           }}
         />
+      )}
+
+      {/* High-Speed Dynamic Wind Velocity Streaks */}
+      {(hud.speedKmh > 52 || hud.isFeverMode) && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-10 overflow-hidden opacity-30 mix-blend-screen"
+        >
+          <div className="absolute top-0 bottom-0 left-0 w-16 sm:w-28 bg-gradient-to-r from-cyan-400/35 via-cyan-300/15 to-transparent" />
+          <div className="absolute top-0 bottom-0 right-0 w-16 sm:w-28 bg-gradient-to-l from-cyan-400/35 via-cyan-300/15 to-transparent" />
+        </div>
       )}
 
       {/* Full-viewport red warning vignette when tsunami approaches */}
@@ -174,6 +186,12 @@ export function GameHud({
                   {hud.gradientPct > 0 ? `+${hud.gradientPct}` : hud.gradientPct}%
                 </span>
               </span>
+
+              <span className="flex items-center gap-1 text-teal-300" title="沿海实时风速与风向">
+                <Wind className="w-3 h-3 text-teal-300" />
+                <span>{hud.windSpeedKmh} <span className="text-[9px] text-slate-400">km/h</span></span>
+                <span className="text-[10px] text-teal-200/90 font-sans font-medium px-1 py-0.2 rounded bg-teal-500/20">{hud.windDirectionLabel}</span>
+              </span>
             </div>
 
             {/* Speedometer Tachometer Gauge Bar */}
@@ -193,6 +211,37 @@ export function GameHud({
               </div>
               <span className="font-mono text-[9px] text-sky-300">
                 {hud.tachometerPct}%
+              </span>
+            </div>
+
+            {/* GPS Coastal Elevation Profile (ClimbPro Style) */}
+            <div className="mt-1 flex items-center gap-1.5" title="沿海公路起伏海拔剖面 (ClimbPro)">
+              <span className="text-[9px] font-mono text-slate-400">ELEV</span>
+              <div className="h-3 flex-1 rounded bg-black/30 px-1 py-0.5 relative overflow-hidden flex items-end">
+                <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 20">
+                  <path
+                    d={`M 0 16 Q 25 ${12 - Math.sin(hud.distanceMeters * 0.02) * 6} 50 ${10 + Math.cos(hud.distanceMeters * 0.015) * 6} T 100 14 L 100 20 L 0 20 Z`}
+                    fill="rgba(56, 189, 248, 0.28)"
+                  />
+                  <path
+                    d={`M 0 16 Q 25 ${12 - Math.sin(hud.distanceMeters * 0.02) * 6} 50 ${10 + Math.cos(hud.distanceMeters * 0.015) * 6} T 100 14`}
+                    fill="none"
+                    stroke="#38bdf8"
+                    strokeWidth="1.2"
+                  />
+                  {/* Rider altitude marker dot */}
+                  <circle
+                    cx="25"
+                    cy={12 - Math.sin(hud.distanceMeters * 0.02) * 6}
+                    r="2.2"
+                    fill="#fde047"
+                    stroke="#0f172a"
+                    strokeWidth="0.8"
+                  />
+                </svg>
+              </div>
+              <span className="font-mono text-[9px] text-emerald-300">
+                {Math.round(8 + Math.sin(hud.distanceMeters * 0.008) * 6 + hud.distanceMeters * 0.002)}m
               </span>
             </div>
           </div>

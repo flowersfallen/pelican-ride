@@ -108,7 +108,7 @@ export function PauseMenuModal({
           >
             <div className="text-[10px] text-amber-300 font-medium">已解锁成就 ❯</div>
             <div className="text-sm sm:text-base font-bold text-amber-300 font-mono mt-0.5">
-              {hud.totalAchievementsUnlocked} / 22
+              {hud.totalAchievementsUnlocked} / 30
             </div>
           </button>
         </div>

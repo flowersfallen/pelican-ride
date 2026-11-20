@@ -28,7 +28,16 @@ export type AchievementId =
   | 'coastal_melody'
   | 'seagull_escort'
   | 'blue_tears'
-  | 'coastal_milestone';
+  | 'coastal_milestone'
+  | 'coastal_rainbow'
+  | 'tailwind_rider'
+  | 'twilight_dreamer'
+  | 'peloton_spirit'
+  | 'ocean_whale'
+  | 'century_rider'
+  | 'bonfire_gatherer'
+  | 'grand_tour_master'
+  | 'coconut_refresh';
 
 export type GraphicQuality = 'high' | 'battery_saver';
 
@@ -48,6 +57,8 @@ export interface LifetimeStats {
   totalDriftTurbos: number;
 }
 
+export type BellTone = 'brass' | 'vintage_horn' | 'electronic' | 'conch';
+
 export interface PelicanIdentity {
   id: string;
   tag: string;
@@ -57,6 +68,7 @@ export interface PelicanIdentity {
   scarfColor: string;
   frameColor: string;
   accentColor: string;
+  bellTone?: BellTone;
 }
 
 export interface InputState {
@@ -130,4 +142,6 @@ export interface GameHudState {
   bgmVolume: number;
   gear: number;
   tachometerPct: number;
+  windSpeedKmh: number;
+  windDirectionLabel: string;
 }

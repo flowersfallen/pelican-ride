@@ -198,20 +198,160 @@ class CoastalAudioEngine {
     if (!this.ctx) return;
 
     const now = this.ctx.currentTime;
-    const freqs = [1568, 3136]; // Bright metallic bicycle bell harmonics
-    freqs.forEach((f, idx) => {
-      if (!this.ctx) return;
+    // Classic two-hammer mechanical brass bell: strike 1 (Ding) + strike 2 (Dong)
+    const strikes = [
+      { delay: 0.0, freqs: [2093.0, 3136.0, 4186.0], vol: 0.16, decay: 0.58 }, // High Ding
+      { delay: 0.082, freqs: [1760.0, 2637.0, 3520.0], vol: 0.13, decay: 0.72 }, // Warm Dong
+    ];
+
+    strikes.forEach(({ delay, freqs, vol, decay }) => {
+      freqs.forEach((f, idx) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = idx === 0 ? 'sine' : 'triangle';
+        osc.frequency.setValueAtTime(f, now + delay);
+        gain.gain.setValueAtTime(idx === 0 ? vol : vol * 0.45, now + delay);
+        gain.gain.exponentialRampToValueAtTime(0.0005, now + delay + decay);
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(now + delay);
+        osc.stop(now + delay + decay + 0.02);
+      });
+    });
+  }
+
+  public playVintageHorn(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // Squeeze rubber bulb honk: 380Hz dipping to 310Hz with rich square/saw harmonics
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(f, now);
-      gain.gain.setValueAtTime(idx === 0 ? 0.14 : 0.06, now);
-      gain.gain.exponentialRampToValueAtTime(0.0008, now + 0.55);
-      osc.connect(gain);
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(390, now);
+      osc.frequency.exponentialRampToValueAtTime(310, now + 0.18);
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1400, now);
+      filter.Q.setValueAtTime(3.0, now);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.18, now + 0.02);
+      gain.gain.setValueAtTime(0.16, now + 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+      osc.connect(filter);
+      filter.connect(gain);
       gain.connect(this.getDestination());
       osc.start(now);
-      osc.stop(now + 0.56);
-    });
+      osc.stop(now + 0.24);
+
+      // Second double-toot honk
+      const osc2 = this.ctx.createOscillator();
+      const gain2 = this.ctx.createGain();
+      osc2.type = 'sawtooth';
+      osc2.frequency.setValueAtTime(420, now + 0.14);
+      osc2.frequency.exponentialRampToValueAtTime(340, now + 0.32);
+
+      const filter2 = this.ctx.createBiquadFilter();
+      filter2.type = 'lowpass';
+      filter2.frequency.setValueAtTime(1500, now + 0.14);
+      filter2.Q.setValueAtTime(3.0, now + 0.14);
+
+      gain2.gain.setValueAtTime(0.001, now + 0.14);
+      gain2.gain.linearRampToValueAtTime(0.19, now + 0.16);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
+
+      osc2.connect(filter2);
+      filter2.connect(gain2);
+      gain2.connect(this.getDestination());
+      osc2.start(now + 0.14);
+      osc2.stop(now + 0.38);
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playElectronicBeep(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // High-tech digital sports dual beep: 2793Hz then 3520Hz
+      const osc1 = this.ctx.createOscillator();
+      const gain1 = this.ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(2793.8, now);
+      gain1.gain.setValueAtTime(0.12, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+      osc1.connect(gain1);
+      gain1.connect(this.getDestination());
+      osc1.start(now);
+      osc1.stop(now + 0.06);
+
+      const osc2 = this.ctx.createOscillator();
+      const gain2 = this.ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(3520.0, now + 0.055);
+      gain2.gain.setValueAtTime(0.14, now + 0.055);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+      osc2.connect(gain2);
+      gain2.connect(this.getDestination());
+      osc2.start(now + 0.055);
+      osc2.stop(now + 0.15);
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playConchHorn(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // Deep sea conch horn: 220Hz fundamental with warm harmonics
+      const freqs = [220, 440, 660];
+      const vols = [0.15, 0.09, 0.04];
+      freqs.forEach((f, idx) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = idx === 0 ? 'triangle' : 'sine';
+        osc.frequency.setValueAtTime(f * 0.96, now);
+        osc.frequency.linearRampToValueAtTime(f, now + 0.12);
+        osc.frequency.exponentialRampToValueAtTime(f * 0.94, now + 0.55);
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(vols[idx], now + 0.08);
+        gain.gain.setValueAtTime(vols[idx], now + 0.35);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(now);
+        osc.stop(now + 0.68);
+      });
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playCustomBell(tone?: string): void {
+    if (tone === 'vintage_horn') {
+      this.playVintageHorn();
+    } else if (tone === 'electronic') {
+      this.playElectronicBeep();
+    } else if (tone === 'conch') {
+      this.playConchHorn();
+    } else {
+      this.playBell();
+    }
   }
 
   public playPickup(type: CollectibleType): void {
@@ -453,6 +593,15 @@ class CoastalAudioEngine {
         this.surfGain = null;
       }
     }
+  }
+
+  public updateOceanProximity(playerX: number): void {
+    if (!this.surfGain || !this.ctx || this.muted) return;
+    const proximityNorm = Math.max(0, Math.min(1, (-playerX + 5.0) / 10.0));
+    const targetGain = (0.04 + proximityNorm * 0.05) * this.masterVolume;
+    try {
+      this.surfGain.gain.setValueAtTime(targetGain, this.ctx.currentTime);
+    } catch {}
   }
 
   public playWhoosh(): void {
@@ -1166,6 +1315,309 @@ class CoastalAudioEngine {
         gain.connect(this.getDestination());
         osc.start(now + idx * 0.08);
         osc.stop(now + idx * 0.08 + 0.5);
+      });
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playRainbowChime(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // Dreamy ethereal celestial harp arpeggio: C6, E6, G6, B6, C7, E7
+      [1046.5, 1318.5, 1567.98, 1975.53, 2093.0, 2637.0].forEach((freq, idx) => {
+        const osc = this.ctx!.createOscillator();
+        const gain = this.ctx!.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+        gain.gain.setValueAtTime(0.001, now + idx * 0.06);
+        gain.gain.linearRampToValueAtTime(0.06, now + idx * 0.06 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.6);
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(now + idx * 0.06);
+        osc.stop(now + idx * 0.06 + 0.65);
+      });
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playCampfireCrackle(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      for (let i = 0; i < 3; i++) {
+        const delay = Math.random() * 0.18;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140 + Math.random() * 280, now + delay);
+        osc.frequency.exponentialRampToValueAtTime(40, now + delay + 0.04);
+        gain.gain.setValueAtTime(0.04, now + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.05);
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(now + delay);
+        osc.stop(now + delay + 0.06);
+      }
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playFirework(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // Rising whistle rocket
+      const rocketOsc = this.ctx.createOscillator();
+      const rocketGain = this.ctx.createGain();
+      rocketOsc.type = 'sine';
+      rocketOsc.frequency.setValueAtTime(320, now);
+      rocketOsc.frequency.exponentialRampToValueAtTime(1400, now + 0.32);
+      rocketGain.gain.setValueAtTime(0.001, now);
+      rocketGain.gain.linearRampToValueAtTime(0.06, now + 0.08);
+      rocketGain.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
+      rocketOsc.connect(rocketGain);
+      rocketGain.connect(this.getDestination());
+      rocketOsc.start(now);
+      rocketOsc.stop(now + 0.35);
+
+      // Distant low boom explosion at burst
+      const boomOsc = this.ctx.createOscillator();
+      const boomGain = this.ctx.createGain();
+      boomOsc.type = 'triangle';
+      boomOsc.frequency.setValueAtTime(95, now + 0.33);
+      boomOsc.frequency.exponentialRampToValueAtTime(35, now + 0.75);
+      boomGain.gain.setValueAtTime(0.18, now + 0.33);
+      boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.78);
+      boomOsc.connect(boomGain);
+      boomGain.connect(this.getDestination());
+      boomOsc.start(now + 0.33);
+      boomOsc.stop(now + 0.8);
+
+      // Crackling sparkling burst stars
+      for (let i = 0; i < 4; i++) {
+        const starDelay = 0.36 + Math.random() * 0.28;
+        const starOsc = this.ctx.createOscillator();
+        const starGain = this.ctx.createGain();
+        starOsc.type = 'sawtooth';
+        starOsc.frequency.setValueAtTime(1800 + Math.random() * 1200, now + starDelay);
+        starOsc.frequency.exponentialRampToValueAtTime(400, now + starDelay + 0.04);
+        starGain.gain.setValueAtTime(0.03, now + starDelay);
+        starGain.gain.exponentialRampToValueAtTime(0.001, now + starDelay + 0.05);
+        starOsc.connect(starGain);
+        starGain.connect(this.getDestination());
+        starOsc.start(now + starDelay);
+        starOsc.stop(now + starDelay + 0.06);
+      }
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playWhaleSong(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // Deep resonant haunting whale call
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+
+      // Pitch glide: 145Hz gliding gently to 105Hz then 125Hz
+      osc.frequency.setValueAtTime(145, now);
+      osc.frequency.exponentialRampToValueAtTime(105, now + 1.2);
+      osc.frequency.linearRampToValueAtTime(125, now + 2.4);
+
+      // Low frequency modulation (vibrato) for organic vocalization
+      const lfo = this.ctx.createOscillator();
+      const lfoGain = this.ctx.createGain();
+      lfo.frequency.setValueAtTime(4.2, now);
+      lfoGain.gain.setValueAtTime(8, now);
+      lfo.connect(lfoGain);
+      lfoGain.connect(osc.frequency);
+      lfo.start(now);
+      lfo.stop(now + 2.8);
+
+      // Slow oceanic swell envelope
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.12, now + 0.6);
+      gain.gain.setValueAtTime(0.12, now + 1.8);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 2.7);
+
+      osc.connect(gain);
+      gain.connect(this.getDestination());
+      osc.start(now);
+      osc.stop(now + 2.8);
+
+      // Ethereal overtone harmonic
+      const overtone = this.ctx.createOscillator();
+      const overGain = this.ctx.createGain();
+      overtone.type = 'sine';
+      overtone.frequency.setValueAtTime(290, now);
+      overtone.frequency.exponentialRampToValueAtTime(220, now + 1.2);
+      overtone.frequency.linearRampToValueAtTime(260, now + 2.2);
+      overGain.gain.setValueAtTime(0.001, now);
+      overGain.gain.linearRampToValueAtTime(0.04, now + 0.7);
+      overGain.gain.exponentialRampToValueAtTime(0.001, now + 2.4);
+      overtone.connect(overGain);
+      overGain.connect(this.getDestination());
+      overtone.start(now);
+      overtone.stop(now + 2.5);
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playWaterSpout(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // High-pressure white noise hissing burst
+      const bufferSize = Math.floor(this.ctx.sampleRate * 1.5);
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.9));
+      }
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1200, now);
+      filter.Q.setValueAtTime(1.8, now);
+
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.14, now + 0.2);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.getDestination());
+      noise.start(now);
+      noise.stop(now + 1.5);
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playRumbleStrip(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // 5 rapid tactile rumble braps simulating road rumble stripes under bike tires
+      for (let i = 0; i < 5; i++) {
+        const stripeTime = now + i * 0.038;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(85, stripeTime);
+        osc.frequency.exponentialRampToValueAtTime(45, stripeTime + 0.03);
+
+        gain.gain.setValueAtTime(0.001, stripeTime);
+        gain.gain.linearRampToValueAtTime(0.12, stripeTime + 0.008);
+        gain.gain.exponentialRampToValueAtTime(0.001, stripeTime + 0.035);
+
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(stripeTime);
+        osc.stop(stripeTime + 0.04);
+      }
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playPavilionBellEcho(tone?: string): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // Slapback echo off pavilion wooden rafters / columns (180ms delay, lower volume)
+      const echoDelay = 0.18;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(tone === 'conch' ? 440 : 2093.0, now + echoDelay);
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1600, now + echoDelay);
+
+      gain.gain.setValueAtTime(0.001, now + echoDelay);
+      gain.gain.linearRampToValueAtTime(0.035, now + echoDelay + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + echoDelay + 0.45);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.getDestination());
+      osc.start(now + echoDelay);
+      osc.stop(now + echoDelay + 0.5);
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  public playCoconutSip(): void {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      // Satisfying liquid gulp sounds
+      [0, 0.12].forEach((delay, idx) => {
+        const osc = this.ctx!.createOscillator();
+        const gain = this.ctx!.createGain();
+        osc.type = 'sine';
+        const startFreq = idx === 0 ? 340 : 380;
+        const endFreq = idx === 0 ? 190 : 220;
+        osc.frequency.setValueAtTime(startFreq, now + delay);
+        osc.frequency.exponentialRampToValueAtTime(endFreq, now + delay + 0.07);
+
+        gain.gain.setValueAtTime(0.001, now + delay);
+        gain.gain.linearRampToValueAtTime(0.14, now + delay + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.08);
+
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(now + delay);
+        osc.stop(now + delay + 0.09);
+      });
+
+      // Refreshing tropical sparkle chime
+      [1318.5, 1661.2, 1975.5, 2637.0].forEach((freq, idx) => {
+        const osc = this.ctx!.createOscillator();
+        const gain = this.ctx!.createGain();
+        const t = now + 0.22 + idx * 0.05;
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, t);
+
+        gain.gain.setValueAtTime(0.001, t);
+        gain.gain.linearRampToValueAtTime(0.08, t + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(t);
+        osc.stop(t + 0.4);
       });
     } catch {
       // Audio fallback
