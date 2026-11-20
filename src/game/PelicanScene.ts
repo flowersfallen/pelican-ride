@@ -3875,11 +3875,9 @@ export class PelicanScene {
     const leanPitch = this.input.accelerate || this.boostTimer > 0 ? -0.07 : this.input.brake ? 0.08 : 0;
     rig.bodyGroup.rotation.x += (leanPitch - rig.bodyGroup.rotation.x) * Math.min(1, 8 * dt);
 
-    // Standing athletic sprint rocking pedal (站立摇车冲刺)
+    // Standing sprint pose: forward lean & pedal bob only, no lateral rocking (站立冲刺：只前倾，不左右摇)
     const isSprinting = this.input.accelerate || this.boostTimer > 0;
     if (isSprinting && speed > 5) {
-      const rockRoll = Math.sin(this.pedalPhase) * 0.085;
-      rig.bodyGroup.rotation.z += rockRoll;
       rig.bodyGroup.position.y = 0.08 + Math.abs(Math.sin(this.pedalPhase)) * 0.07;
       rig.bodyGroup.rotation.x = -0.16;
     } else {
